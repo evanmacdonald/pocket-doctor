@@ -55,7 +55,7 @@ export default function SettingsScreen() {
           <SettingsRow
             label="API Keys"
             subtitle="OpenAI, Anthropic, or Gemini"
-            onPress={() => {}}
+            onPress={() => router.push('/settings/api-keys')}
           />
           <Divider />
           <SettingsRow

@@ -23,7 +23,8 @@
       "Bash(node -e \"const fs = require\\(''node_modules/expo-file-system/build/index''\\); console.log\\(Object.keys\\(fs\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''cache''\\) || k.toLowerCase\\(\\).includes\\(''document''\\) || k.toLowerCase\\(\\).includes\\(''encoding''\\)\\).join\\(''\\\\n''\\)\\)\")",
       "Bash(grep -r \"cacheDirectory\\\\|EncodingType\\\\|documentDirectory\" node_modules/expo-file-system/build/*.d.ts)",
       "Bash(grep -r \"cacheDirectory\\\\|documentDirectory\\\\|EncodingType\\\\|deleteAsync\\\\|shareAsync\" node_modules/expo-file-system/build/*.d.ts)",
-      "Bash(grep -rn \"documentDirectory\\\\|cacheDirectory\\\\|EncodingType\" node_modules/expo-file-system/build/*.d.ts)"
+      "Bash(grep -rn \"documentDirectory\\\\|cacheDirectory\\\\|EncodingType\" node_modules/expo-file-system/build/*.d.ts)",
+      "Bash(node node_modules/@expo/cli/build/bin/cli --version)"
     ]
   }
 }
