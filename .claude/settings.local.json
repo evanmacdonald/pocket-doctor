@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx --version)",
+      "Bash(brew --version)",
+      "Bash(xcodebuild -version)",
+      "Bash(xcrun simctl:*)",
+      "Bash(git --version)",
+      "Bash(npm list:*)",
+      "Bash(npx create-expo-app@latest . --template tabs)",
+      "Bash(npx create-expo-app@latest . --template tabs --yes)",
+      "Read(//private/tmp/**)",
+      "Bash(npx create-expo-app@latest pocket-doctor-scaffold --template tabs)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
