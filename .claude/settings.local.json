@@ -14,7 +14,16 @@
       "Bash(npx create-expo-app@latest pocket-doctor-scaffold --template tabs)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm install:*)",
+      "Bash(ls /Users/evanmacdonald/Documents/GitHub/pocket-doctor/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(ls \"/Users/evanmacdonald/Documents/GitHub/pocket-doctor/app/\\(tabs\\)/\")",
+      "Bash(npx tsc:*)",
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(node -e \"const fs = require\\(''node_modules/expo-file-system/build/index''\\); console.log\\(Object.keys\\(fs\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''cache''\\) || k.toLowerCase\\(\\).includes\\(''document''\\) || k.toLowerCase\\(\\).includes\\(''encoding''\\)\\).join\\(''\\\\n''\\)\\)\")",
+      "Bash(grep -r \"cacheDirectory\\\\|EncodingType\\\\|documentDirectory\" node_modules/expo-file-system/build/*.d.ts)",
+      "Bash(grep -r \"cacheDirectory\\\\|documentDirectory\\\\|EncodingType\\\\|deleteAsync\\\\|shareAsync\" node_modules/expo-file-system/build/*.d.ts)",
+      "Bash(grep -rn \"documentDirectory\\\\|cacheDirectory\\\\|EncodingType\" node_modules/expo-file-system/build/*.d.ts)"
     ]
   }
 }

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "pocket-doctor-scaffold",
-    "slug": "pocket-doctor-scaffold",
+    "name": "Pocket Doctor",
+    "slug": "pocket-doctor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pocketdoctorscaffold",
+    "scheme": "pocketdoctor",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -14,7 +14,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pocketdoctor.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Pocket Doctor uses Face ID to protect your health records.",
+        "NSCameraUsageDescription": "Pocket Doctor uses the camera to scan health documents.",
+        "NSPhotoLibraryUsageDescription": "Pocket Doctor can read photos to import health documents."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +28,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.pocketdoctor.app"
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +36,22 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Pocket Doctor uses the camera to scan health documents."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,0 +1,168 @@
+import {
+  LLMProvider,
+  LLMProviderName,
+  ChatCompletionRequest,
+  ChatCompletionChunk,
+  EmbeddingRequest,
+  EmbeddingResponse,
+  LLMAuthError,
+  LLMNetworkError,
+} from '../types';
+
+const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
+export class GeminiProvider implements LLMProvider {
+  readonly name: LLMProviderName = 'gemini';
+
+  constructor(private readonly apiKey: string) {}
+
+  async complete(req: ChatCompletionRequest): Promise<string> {
+    const { systemInstruction, contents } = this._prepareContents(req.messages);
+
+    const res = await this._fetch(
+      `/models/${req.model}:generateContent`,
+      {
+        systemInstruction,
+        contents,
+        generationConfig: {
+          maxOutputTokens: req.maxTokens ?? 4096,
+          temperature:     req.temperature ?? 0,
+        },
+      }
+    );
+
+    return res.candidates[0].content.parts[0].text as string;
+  }
+
+  async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
+    const { systemInstruction, contents } = this._prepareContents(req.messages);
+
+    const response = await fetch(
+      `${BASE_URL}/models/${req.model}:streamGenerateContent?key=${this.apiKey}&alt=sse`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction,
+          contents,
+          generationConfig: {
+            maxOutputTokens: req.maxTokens ?? 4096,
+            temperature:     req.temperature ?? 0,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) await this._throwOnError(response);
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        yield { delta: '', done: true };
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        try {
+          const json = JSON.parse(data);
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          if (text) yield { delta: text, done: false };
+        } catch {
+          // malformed SSE — skip
+        }
+      }
+    }
+  }
+
+  async embed(req: EmbeddingRequest): Promise<EmbeddingResponse> {
+    const inputs = Array.isArray(req.input) ? req.input : [req.input];
+
+    // Gemini batch embed
+    const res = await this._fetch(`/models/${req.model}:batchEmbedContents`, {
+      requests: inputs.map((text) => ({
+        model:   `models/${req.model}`,
+        content: { parts: [{ text }] },
+      })),
+    });
+
+    return {
+      vectors:    res.embeddings.map((e: { values: number[] }) => e.values),
+      tokenCount: inputs.reduce((sum, t) => sum + Math.ceil(t.length / 4), 0),
+    };
+  }
+
+  async validateKey(apiKey: string): Promise<boolean> {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/models?key=${apiKey}`
+      );
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async listModels(): Promise<string[]> {
+    try {
+      const res = await fetch(`${BASE_URL}/models?key=${this.apiKey}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.models as { name: string }[])
+        .map((m) => m.name.replace('models/', ''))
+        .filter((n) => n.startsWith('gemini'));
+    } catch {
+      return ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+    }
+  }
+
+  // ─── Private ───────────────────────────────────────────────────────────────
+
+  /**
+   * Gemini separates the system instruction from the conversation contents.
+   */
+  private _prepareContents(messages: ChatCompletionRequest['messages']) {
+    const systemMsg = messages.find((m) => m.role === 'system');
+    const rest = messages.filter((m) => m.role !== 'system');
+
+    return {
+      systemInstruction: systemMsg
+        ? { parts: [{ text: systemMsg.content }] }
+        : undefined,
+      contents: rest.map((m) => ({
+        role:  m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+    };
+  }
+
+  private async _fetch(path: string, body: object) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}?key=${this.apiKey}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+      if (!res.ok) await this._throwOnError(res);
+      return res.json();
+    } catch (err) {
+      if (err instanceof LLMAuthError) throw err;
+      throw new LLMNetworkError('gemini', err instanceof Error ? err : undefined);
+    }
+  }
+
+  private async _throwOnError(res: Response): Promise<never> {
+    if (res.status === 401 || res.status === 403) throw new LLMAuthError('gemini');
+    const body = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${body}`);
+  }
+}
