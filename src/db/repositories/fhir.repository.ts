@@ -81,7 +81,9 @@ export async function upsertFhirResource(
   const textContent = extractTextContent(row.resourceJson, row.resourceType);
   await indexFhirResourceFts(id, row.resourceType, textContent);
 
-  return (await db.query.fhirResources.findFirst({ where: eq(fhirResources.id, id) }))!;
+  const saved = await db.query.fhirResources.findFirst({ where: eq(fhirResources.id, id) });
+  if (!saved) throw new Error(`Failed to retrieve FHIR resource after upsert: ${id}`);
+  return saved;
 }
 
 export async function getFhirResourceById(id: string): Promise<FhirResource | undefined> {

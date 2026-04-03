@@ -24,7 +24,7 @@ export class OpenAIProvider implements LLMProvider {
       temperature: req.temperature ?? 0,
       stream:      false,
     });
-    return res.choices[0].message.content as string;
+    return res.choices?.[0]?.message?.content ?? '';
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {

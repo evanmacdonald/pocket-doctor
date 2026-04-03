@@ -16,8 +16,8 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async complete(req: ChatCompletionRequest): Promise<string> {
-    const { systemInstruction, contents } = this._prepareContents(req.messages);
+  async complete(req: ChatCompletionRequest & { _pdfBase64?: string }): Promise<string> {
+    const { systemInstruction, contents } = this._prepareContents(req.messages, req._pdfBase64);
 
     const res = await this._fetch(
       `/models/${req.model}:generateContent`,
@@ -31,7 +31,7 @@ export class GeminiProvider implements LLMProvider {
       }
     );
 
-    return res.candidates[0].content.parts[0].text as string;
+    return res.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
@@ -129,19 +129,32 @@ export class GeminiProvider implements LLMProvider {
 
   /**
    * Gemini separates the system instruction from the conversation contents.
+   * When pdfBase64 is provided the user turn gets an inline_data part instead of text.
    */
-  private _prepareContents(messages: ChatCompletionRequest['messages']) {
+  private _prepareContents(messages: ChatCompletionRequest['messages'], pdfBase64?: string) {
     const systemMsg = messages.find((m) => m.role === 'system');
     const rest = messages.filter((m) => m.role !== 'system');
+
+    const contents = rest.map((m) => {
+      if (pdfBase64 && m.role === 'user') {
+        return {
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: 'application/pdf', data: pdfBase64 } },
+          ],
+        };
+      }
+      return {
+        role:  m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      };
+    });
 
     return {
       systemInstruction: systemMsg
         ? { parts: [{ text: systemMsg.content }] }
         : undefined,
-      contents: rest.map((m) => ({
-        role:  m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      })),
+      contents,
     };
   }
 

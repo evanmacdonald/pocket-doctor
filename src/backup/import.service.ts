@@ -68,7 +68,12 @@ export async function importHealthData(
   if (mode === 'replace') {
     // Clear existing data (except audit log) via raw SQL
     const sqlite = getSQLite();
-    await sqlite.execAsync('DELETE FROM chat_messages; DELETE FROM chat_sessions; DELETE FROM fhir_resources; DELETE FROM fhir_resources_fts; DELETE FROM documents; DELETE FROM app_settings;');
+    await sqlite.execAsync('DELETE FROM chat_messages');
+    await sqlite.execAsync('DELETE FROM chat_sessions');
+    await sqlite.execAsync('DELETE FROM fhir_resources');
+    await sqlite.execAsync('DELETE FROM fhir_resources_fts');
+    await sqlite.execAsync('DELETE FROM documents');
+    await sqlite.execAsync('DELETE FROM app_settings');
   }
 
   // Insert all rows — ignore conflicts in merge mode

@@ -83,8 +83,8 @@ export class LLMNetworkError extends Error {
 // Default models per provider (cost-optimised for health record parsing)
 export const DEFAULT_MODELS: Record<LLMProviderName, string> = {
   openai:    'gpt-4o-mini',
-  anthropic: 'claude-3-5-haiku-20241022',
-  gemini:    'gemini-2.0-flash',
+  anthropic: 'claude-3-5-haiku-latest',
+  gemini:    'gemini-1.5-flash',
 };
 
 // Default embedding models per provider (Anthropic doesn't support embeddings)

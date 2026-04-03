@@ -27,7 +27,7 @@ export class AnthropicProvider implements LLMProvider {
       max_tokens: req.maxTokens ?? 4096,
       ...(req.temperature !== undefined && { temperature: req.temperature }),
     });
-    return res.content[0].text as string;
+    return res.content?.[0]?.text ?? '';
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
@@ -94,7 +94,7 @@ export class AnthropicProvider implements LLMProvider {
           'anthropic-version':  API_VERSION,
         },
         body: JSON.stringify({
-          model:      'claude-3-5-haiku-20241022',
+          model:      'claude-3-5-haiku-latest',
           max_tokens: 1,
           messages:   [{ role: 'user', content: 'hi' }],
         }),

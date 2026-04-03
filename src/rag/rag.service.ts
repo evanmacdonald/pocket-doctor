@@ -111,13 +111,16 @@ export async function embedFhirResource(
  */
 export async function getEmbeddingCoverage(): Promise<{ indexed: number; total: number }> {
   const sqlite = getSQLite();
-  const [{ total }] = await sqlite.getAllAsync<{ total: number }>(
+  const totalRows = await sqlite.getAllAsync<{ total: number }>(
     `SELECT COUNT(*) as total FROM fhir_resources WHERE is_deleted = 0`
   );
-  const [{ indexed }] = await sqlite.getAllAsync<{ indexed: number }>(
+  const indexedRows = await sqlite.getAllAsync<{ indexed: number }>(
     `SELECT COUNT(*) as indexed FROM embedding_metadata`
   );
-  return { indexed, total };
+  return {
+    total:   totalRows[0]?.total   ?? 0,
+    indexed: indexedRows[0]?.indexed ?? 0,
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
