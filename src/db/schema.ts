@@ -18,6 +18,7 @@ export const fhirResources = sqliteTable(
     sourceDocumentId: text('source_document_id'),        // FK → documents.id
     portalId:         text('portal_id'),                 // FK → portalConnections.id
     effectiveDate:    text('effective_date'),             // denormalized ISO date
+    contentHash:      text('content_hash'),              // dedup fingerprint (resourceType:hash)
     createdAt:        integer('created_at').notNull(),
     updatedAt:        integer('updated_at').notNull(),
     isDeleted:        integer('is_deleted').notNull().default(0),

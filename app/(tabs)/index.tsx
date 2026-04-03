@@ -244,11 +244,15 @@ export default function RecordsScreen() {
       await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
       await FileSystem.copyAsync({ from: asset.uri, to: destPath });
 
+      // Store path relative to documentDirectory so it survives app reinstalls
+      // (absolute paths contain a container UUID that changes on reinstall)
+      const relativePath = destPath.replace(FileSystem.documentDirectory ?? '', '');
+
       await storeDocument({
         filename:   asset.name,
         sourceType: 'pdf_upload',
         mimeType:   asset.mimeType ?? 'application/pdf',
-        filePath:   destPath,
+        filePath:   relativePath,
       });
 
       await loadData();
@@ -265,15 +269,30 @@ export default function RecordsScreen() {
       Alert.alert('No file', 'The original file is not available.');
       return;
     }
+    // The stored filePath may contain a stale app container UUID (changes on reinstall).
+    // Re-anchor it to the current documentDirectory by stripping everything before /documents/.
+    const relativePart = doc.filePath.includes('/documents/')
+      ? doc.filePath.substring(doc.filePath.indexOf('/documents/'))
+      : doc.filePath;
+    const resolvedPath = `${FileSystem.documentDirectory}${relativePart.replace(/^\//, '')}`;
+
+    const info = await FileSystem.getInfoAsync(resolvedPath);
+    if (!info.exists) {
+      Alert.alert('File not found', 'The original file is no longer available on this device.');
+      return;
+    }
     const available = await Sharing.isAvailableAsync();
     if (!available) {
       Alert.alert('Not available', 'File sharing is not available on this device.');
       return;
     }
-    await Sharing.shareAsync(doc.filePath, {
+    const tmpPath = `${FileSystem.cacheDirectory}${doc.filename}`;
+    await FileSystem.copyAsync({ from: resolvedPath, to: tmpPath });
+    await Sharing.shareAsync(tmpPath, {
       mimeType: doc.mimeType,
       dialogTitle: doc.filename,
     });
+    await FileSystem.deleteAsync(tmpPath, { idempotent: true });
   }, []);
 
   const handleDelete = useCallback((docId: string, filename: string) => {

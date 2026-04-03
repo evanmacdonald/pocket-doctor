@@ -1,4 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
+
+/** Resolve a stored file path (may be relative) to an absolute URI. */
+function resolvePath(filePath: string): string {
+  if (filePath.startsWith('file://') || filePath.startsWith('/')) return filePath;
+  return `${FileSystem.documentDirectory ?? ''}${filePath}`;
+}
 import { getDatabase } from '~/db/client';
 import { documents } from '~/db/schema';
 import { upsertFhirResource } from '~/db/repositories/fhir.repository';
@@ -59,7 +65,7 @@ export async function processDocument(docId: string): Promise<void> {
     filename:   doc.filename,
     sourceType: doc.sourceType as IngestionSource,
     mimeType:   doc.mimeType,
-    filePath:   doc.filePath ?? undefined,
+    filePath:   doc.filePath ? resolvePath(doc.filePath) : undefined,
     rawText:    doc.rawText ?? undefined,
   }));
 }
@@ -73,7 +79,7 @@ export async function deleteDocument(docId: string): Promise<void> {
 
   // Delete the physical file if it exists
   if (doc?.filePath) {
-    try { await FileSystem.deleteAsync(doc.filePath, { idempotent: true }); } catch { /* ignore */ }
+    try { await FileSystem.deleteAsync(resolvePath(doc.filePath), { idempotent: true }); } catch { /* ignore */ }
   }
 
   // Soft-delete associated FHIR resources

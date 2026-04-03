@@ -30,6 +30,7 @@ export async function openDatabase() {
       source_document_id  TEXT,
       portal_id           TEXT,
       effective_date      TEXT,
+      content_hash        TEXT,
       created_at          INTEGER NOT NULL,
       updated_at          INTEGER NOT NULL,
       is_deleted          INTEGER NOT NULL DEFAULT 0
@@ -141,6 +142,11 @@ export async function openDatabase() {
   `);
 
   _db = drizzle(_sqlite, { schema, logger: false });
+
+  // Add content_hash column if it doesn't exist (migration for existing installs)
+  await _sqlite.execAsync(
+    `ALTER TABLE fhir_resources ADD COLUMN content_hash TEXT`
+  ).catch(() => { /* column already exists — ignore */ });
 
   // Reset any documents stuck in pending/processing from a previous crashed session
   await _sqlite.runAsync(
