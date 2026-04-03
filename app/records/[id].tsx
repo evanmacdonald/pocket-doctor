@@ -174,6 +174,12 @@ export default function RecordDetailScreen() {
       <Stack.Screen
         options={{
           title: record.resourceType,
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} className="pl-1 pr-3 active:opacity-60 flex-row items-center gap-1">
+              <FontAwesome name="chevron-left" size={14} color="#2563eb" />
+              <Text className="text-primary-600 text-base">Records</Text>
+            </Pressable>
+          ),
           headerRight: () => (
             <Pressable onPress={handleDelete} className="pr-2 active:opacity-60">
               <FontAwesome name="trash" size={18} color="#ef4444" />
