@@ -9,6 +9,16 @@ import {
 } from '~/utils/secure-store';
 import { providerRegistry } from '~/llm/provider-registry';
 import { logEvent } from '~/db/repositories/audit.repository';
+import { setSetting } from '~/db/repositories/settings.repository';
+import { OpenAIProvider } from '~/llm/providers/openai.provider';
+import { AnthropicProvider } from '~/llm/providers/anthropic.provider';
+import { GeminiProvider } from '~/llm/providers/gemini.provider';
+
+const DEFAULT_MODEL: Record<Provider, string> = {
+  openai:    'gpt-4o-mini',
+  anthropic: 'claude-3-5-haiku-latest',
+  gemini:    'gemini-1.5-flash',
+};
 
 type Provider = 'openai' | 'anthropic' | 'gemini';
 
@@ -79,15 +89,8 @@ export default function ApiKeysScreen() {
     setValidating(provider);
 
     try {
-      const p = await providerRegistry.getProvider(provider);
-      // Build a temp provider just for validation
-      const { OpenAIProvider }    = require('~/llm/providers/openai.provider');
-      const { AnthropicProvider } = require('~/llm/providers/anthropic.provider');
-      const { GeminiProvider }    = require('~/llm/providers/gemini.provider');
-
-      const tempProviders = { openai: OpenAIProvider, anthropic: AnthropicProvider, gemini: GeminiProvider };
-      const TempClass = tempProviders[provider];
-      const temp = new TempClass(input);
+      const TempProviders = { openai: OpenAIProvider, anthropic: AnthropicProvider, gemini: GeminiProvider };
+      const temp = new TempProviders[provider](input);
       const valid = await temp.validateKey(input);
 
       if (!valid) {
@@ -97,6 +100,10 @@ export default function ApiKeysScreen() {
 
       await setSecureItem(SECURE_KEY_MAP[provider], input);
       providerRegistry.invalidate(provider);
+
+      // Make this the active provider so ingestion uses it immediately
+      await setSetting('active_provider', provider);
+      await setSetting('active_model', DEFAULT_MODEL[provider]);
 
       setKeys((k) => ({ ...k, [provider]: input }));
       setInputs((i) => ({ ...i, [provider]: '' }));
@@ -193,7 +200,8 @@ export default function ApiKeysScreen() {
                     onChangeText={(v) => setInputs((i) => ({ ...i, [provider.id]: v }))}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    secureTextEntry
+                    autoComplete="off"
+                    spellCheck={false}
                   />
                   <Pressable
                     onPress={() => handleSave(provider.id)}

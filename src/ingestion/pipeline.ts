@@ -4,11 +4,12 @@ import { documents } from '~/db/schema';
 import { upsertFhirResource } from '~/db/repositories/fhir.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
 import { getSetting } from '~/db/repositories/settings.repository';
-import { normalizeTextToFhir } from './normalizers/fhir.normalizer';
+import { normalizeTextToFhir, normalizePdfToFhir } from './normalizers/fhir.normalizer';
 import { embedFhirResource } from '~/rag/rag.service';
 import { ingestionQueue } from './queue';
 import { uuid } from '~/utils/uuid';
 import { eq } from 'drizzle-orm';
+import { fhirResources } from '~/db/schema';
 
 export type IngestionSource = 'pdf_upload' | 'camera_scan' | 'portal';
 
@@ -22,10 +23,10 @@ export interface IngestDocumentParams {
 }
 
 /**
- * Queue a document for ingestion.
- * Returns the document ID immediately; processing happens async.
+ * Store a document record without processing it.
+ * Returns the document ID. Call processDocument(id) to trigger LLM extraction.
  */
-export async function ingestDocument(params: IngestDocumentParams): Promise<string> {
+export async function storeDocument(params: IngestDocumentParams): Promise<string> {
   const db = getDatabase();
   const id  = uuid();
   const now = Date.now();
@@ -41,6 +42,56 @@ export async function ingestDocument(params: IngestDocumentParams): Promise<stri
     createdAt:       now,
   });
 
+  return id;
+}
+
+/**
+ * Queue an existing document for LLM processing.
+ */
+export async function processDocument(docId: string): Promise<void> {
+  const db = getDatabase();
+  const doc = await db.query.documents.findFirst({
+    where: eq(documents.id, docId),
+  });
+  if (!doc) throw new Error(`Document ${docId} not found`);
+
+  ingestionQueue.enqueue(() => _processDocument(docId, {
+    filename:   doc.filename,
+    sourceType: doc.sourceType as IngestionSource,
+    mimeType:   doc.mimeType,
+    filePath:   doc.filePath ?? undefined,
+    rawText:    doc.rawText ?? undefined,
+  }));
+}
+
+/**
+ * Delete a document and all its associated FHIR resources.
+ */
+export async function deleteDocument(docId: string): Promise<void> {
+  const db = getDatabase();
+  const doc = await db.query.documents.findFirst({ where: eq(documents.id, docId) });
+
+  // Delete the physical file if it exists
+  if (doc?.filePath) {
+    try { await FileSystem.deleteAsync(doc.filePath, { idempotent: true }); } catch { /* ignore */ }
+  }
+
+  // Soft-delete associated FHIR resources
+  await db
+    .update(fhirResources)
+    .set({ isDeleted: 1, updatedAt: Date.now() })
+    .where(eq(fhirResources.sourceDocumentId, docId));
+
+  // Delete the document row
+  await db.delete(documents).where(eq(documents.id, docId));
+}
+
+/**
+ * Queue a document for ingestion.
+ * Returns the document ID immediately; processing happens async.
+ */
+export async function ingestDocument(params: IngestDocumentParams): Promise<string> {
+  const id = await storeDocument(params);
   ingestionQueue.enqueue(() => _processDocument(id, params));
   return id;
 }
@@ -75,9 +126,24 @@ async function _processDocument(
       const bundle = JSON.parse(params.fhirJson);
       fhirEntries = bundle.entry ?? [];
     } else if (rawText.trim().length > 20) {
-      // PDF/camera: normalize via LLM
+      // Text was extracted — normalize via LLM
       const bundle = await normalizeTextToFhir(rawText);
       fhirEntries = bundle.entry ?? [];
+    } else if (params.filePath && params.mimeType === 'application/pdf') {
+      // Compressed PDF — send bytes directly to the LLM (Gemini supports inline PDFs)
+      const bundle = await normalizePdfToFhir(params.filePath);
+      fhirEntries = bundle.entry ?? [];
+    } else {
+      throw new Error(
+        'No readable text found in this document. Try a PDF exported from Word, Pages, or a patient portal.'
+      );
+    }
+
+    if (fhirEntries.length === 0) {
+      throw new Error(
+        'The document was processed but no medical records could be extracted. ' +
+        'Try a document that contains diagnoses, medications, lab results, or immunizations.'
+      );
     }
 
     // ── Step 3: Store FHIR resources ──────────────────────────────────────
@@ -122,23 +188,40 @@ async function _processDocument(
 }
 
 async function _extractText(filePath: string, mimeType: string): Promise<string> {
-  // For PDF: attempt to read as text (digital PDFs only)
-  // Scanned/image PDFs will return base64 content — detect and return empty string
-  // The UI layer is responsible for passing rawText from ML Kit OCR for image files.
   if (mimeType === 'application/pdf') {
     try {
-      const content = await FileSystem.readAsStringAsync(filePath, {
-        encoding: FileSystem.EncodingType.UTF8,
+      // Read as base64 then decode to binary string.
+      // UTF-8 decoding corrupts binary PDF content — base64 preserves it.
+      const base64 = await FileSystem.readAsStringAsync(filePath, {
+        encoding: FileSystem.EncodingType.Base64,
       });
-      // Crude check: if >80% of content is ASCII printable, treat as text PDF
-      const printable = content.replace(/[^\x20-\x7E\n\r\t]/g, '').length;
-      if (printable / content.length > 0.8) {
-        return content.slice(0, 50000);
+      const binary = atob(base64);
+
+      // PDF text is stored as literal strings in content streams, followed by
+      // text-show operators: Tj (single string), TJ (array), ' or "
+      // Pattern: (text content) Tj
+      const texts: string[] = [];
+      const re = /\(([^)\\]{0,500}(?:\\.[^)\\]{0,500})*)\)\s*(?:Tj|TJ|'|")/g;
+      let m: RegExpExecArray | null;
+
+      while ((m = re.exec(binary)) !== null) {
+        const chunk = m[1]
+          .replace(/\\n/g, ' ')
+          .replace(/\\r/g, ' ')
+          .replace(/\\t/g, ' ')
+          .replace(/\\\(/g, '(')
+          .replace(/\\\)/g, ')')
+          .replace(/\\\\/g, '\\')
+          .replace(/[^\x20-\x7E]/g, ''); // keep printable ASCII only
+        if (chunk.trim().length > 0) texts.push(chunk.trim());
       }
+
+      const result = texts.join(' ').replace(/\s+/g, ' ').trim();
+      if (result.length > 50) return result.slice(0, 50000);
     } catch {
-      // Binary PDF — falls through to return empty
+      // Unreadable — fall through
     }
-    return ''; // Triggers ML Kit OCR fallback in the UI layer
+    return '';
   }
   return '';
 }

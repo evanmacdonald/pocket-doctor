@@ -19,7 +19,103 @@ export async function openDatabase() {
   await _sqlite.execAsync('PRAGMA journal_mode = WAL;');
   await _sqlite.execAsync('PRAGMA foreign_keys = ON;');
 
-  // Create FTS5 virtual table for keyword search
+  // ── Create schema tables (IF NOT EXISTS = safe to run every startup) ─────────
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS fhir_resources (
+      id                  TEXT PRIMARY KEY,
+      resource_id         TEXT,
+      resource_type       TEXT NOT NULL,
+      resource_json       TEXT NOT NULL,
+      source_document_id  TEXT,
+      portal_id           TEXT,
+      effective_date      TEXT,
+      created_at          INTEGER NOT NULL,
+      updated_at          INTEGER NOT NULL,
+      is_deleted          INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_fhir_type   ON fhir_resources(resource_type);
+    CREATE INDEX IF NOT EXISTS idx_fhir_source ON fhir_resources(source_document_id);
+    CREATE INDEX IF NOT EXISTS idx_fhir_date   ON fhir_resources(effective_date);
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id                TEXT PRIMARY KEY,
+      filename          TEXT NOT NULL,
+      source_type       TEXT NOT NULL,
+      mime_type         TEXT NOT NULL,
+      file_path         TEXT,
+      raw_text          TEXT,
+      ingestion_status  TEXT NOT NULL DEFAULT 'pending',
+      ingestion_error   TEXT,
+      sha256_hash       TEXT,
+      created_at        INTEGER NOT NULL,
+      processed_at      INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_doc_status ON documents(ingestion_status);
+    CREATE INDEX IF NOT EXISTS idx_doc_hash   ON documents(sha256_hash);
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id          TEXT PRIMARY KEY,
+      title       TEXT,
+      provider    TEXT NOT NULL,
+      model       TEXT NOT NULL,
+      search_mode TEXT NOT NULL,
+      created_at  INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL
+    );
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id                TEXT PRIMARY KEY,
+      session_id        TEXT NOT NULL REFERENCES chat_sessions(id),
+      role              TEXT NOT NULL,
+      content           TEXT NOT NULL,
+      context_fhir_ids  TEXT,
+      token_count       INTEGER,
+      created_at        INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_msg_session ON chat_messages(session_id, created_at);
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS portal_connections (
+      id               TEXT PRIMARY KEY,
+      portal_id        TEXT NOT NULL UNIQUE,
+      display_name     TEXT NOT NULL,
+      access_token     TEXT,
+      refresh_token    TEXT,
+      token_expires_at INTEGER,
+      last_synced_at   INTEGER,
+      status           TEXT NOT NULL DEFAULT 'disconnected'
+    );
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type    TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id   TEXT,
+      metadata_json TEXT,
+      created_at    INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at);
+  `);
+
+  await _sqlite.execAsync(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  // ── FTS5 virtual table (references fhir_resources — must come after it) ──────
+
   await _sqlite.execAsync(`
     CREATE VIRTUAL TABLE IF NOT EXISTS fhir_resources_fts USING fts5(
       resource_id,
@@ -31,14 +127,12 @@ export async function openDatabase() {
     );
   `);
 
-  // Create sqlite-vec virtual table for RAG embeddings
-  // NOTE: sqlite-vec (vec0) must be loaded as an extension.
-  // In a development build, this is configured via the expo-sqlite plugin in app.json.
-  // For now we create the metadata table; the vec0 table is created after extension load.
+  // ── Embedding metadata (companion to sqlite-vec vec0 virtual table) ──────────
+
   await _sqlite.execAsync(`
     CREATE TABLE IF NOT EXISTS embedding_metadata (
-      rowid      INTEGER PRIMARY KEY,
-      fhir_id    TEXT NOT NULL,
+      rowid       INTEGER PRIMARY KEY,
+      fhir_id     TEXT NOT NULL,
       chunk_index INTEGER NOT NULL DEFAULT 0,
       chunk_text  TEXT NOT NULL,
       model       TEXT NOT NULL,
@@ -47,6 +141,13 @@ export async function openDatabase() {
   `);
 
   _db = drizzle(_sqlite, { schema, logger: false });
+
+  // Reset any documents stuck in pending/processing from a previous crashed session
+  await _sqlite.runAsync(
+    `UPDATE documents SET ingestion_status = 'failed', ingestion_error = 'App was closed during processing'
+     WHERE ingestion_status IN ('pending', 'processing')`
+  );
+
   return _db;
 }
 
