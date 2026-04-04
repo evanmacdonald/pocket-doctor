@@ -1,22 +1,29 @@
 import { providerRegistry } from './provider-registry';
 import { getSetting } from '~/db/repositories/settings.repository';
-import { ftsSearch } from '~/rag/fts.service';
-import { ragSearch } from '~/rag/rag.service';
-import { buildContextFromFts, buildContextFromRag } from '~/rag/context-builder';
-import { addChatMessage, updateChatSessionTitle } from '~/db/repositories/chat.repository';
+
+// Cached resolved model per provider — avoids a listModels() network call on every message.
+// Invalidated by providerRegistry.invalidate() when keys change (handled externally).
+const resolvedModelCache = new Map<string, string>();
+import { buildFullContext } from '~/rag/context-builder';
+import { addChatMessage, getChatMessages, updateChatSessionTitle } from '~/db/repositories/chat.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
 import type { LLMProviderName } from './types';
 import type { ChatCompletionChunk } from './types';
 
-const HEALTH_SYSTEM_PROMPT = `You are a knowledgeable health assistant helping a patient understand their own medical records.
+const SYSTEM_PROMPT = `You are a knowledgeable, caring medical assistant. The patient's complete health records are attached below.
 
-Guidelines:
-- Answer based ONLY on the health records provided in context below.
-- If information is not in the records, say so clearly — do not guess or hallucinate.
-- Use plain, accessible language. Avoid excessive medical jargon.
-- Never provide a diagnosis or treatment recommendation — you can explain what records say, but always suggest the patient consult their healthcare provider for medical decisions.
-- If the patient asks about something not in their records, acknowledge it and suggest they ask their doctor.
-- Be concise but thorough.
+Your role:
+- Help the patient understand their own health records in clear, plain language
+- Answer questions about their conditions, medications, lab results, allergies, procedures, and immunizations
+- Explain what medical terms mean, what findings typically indicate, and how different parts of their health picture relate to each other
+- Point out things the patient might want to discuss with their doctor
+- Be conversational and warm — like a knowledgeable friend who happens to be a physician
+
+Ground rules:
+- Base your answers on the records provided. If something isn't in the records, say so clearly.
+- Never guess, hallucinate, or invent details not present in the records.
+- You are not providing a formal medical opinion or diagnosis — always recommend the patient discuss treatment decisions with their healthcare provider.
+- When referencing a record, be specific (e.g. "According to your records, you have a penicillin allergy noted on...")
 
 `;
 
@@ -33,62 +40,71 @@ export interface SendMessageResult {
 }
 
 /**
- * Send a user message, retrieve context from health records,
- * call the active LLM provider, and persist both messages.
- *
- * Supports streaming via the optional onChunk callback.
+ * Send a user message in a chat session backed by the patient's full health
+ * record context. Supports streaming via the optional onChunk callback.
  */
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
   const { sessionId, userMessage, onChunk } = params;
 
-  const providerName  = await getSetting('active_provider') as LLMProviderName;
-  const model         = await getSetting('active_model');
-  const searchMode    = await getSetting('search_mode');
-  const provider      = await providerRegistry.getProvider(providerName);
+  const [providerName, storedModel] = await Promise.all([
+    getSetting('active_provider') as Promise<LLMProviderName>,
+    getSetting('active_model'),
+  ]);
 
+  const provider = await providerRegistry.getProvider(providerName);
   if (!provider) {
     throw new Error(
       `No API key configured for ${providerName}. Go to Settings → API Keys to add one.`
     );
   }
 
-  // ── 1. Retrieve relevant health record context ────────────────────────────
-  let context: string;
-  let fhirIds: string[];
-
-  if (searchMode === 'rag') {
-    const results = await ragSearch(userMessage, 10);
-    ({ context, fhirIds } = await buildContextFromRag(results));
-  } else {
-    const results = await ftsSearch(userMessage, 15);
-    ({ context, fhirIds } = await buildContextFromFts(results));
+  // For Gemini, stored model names go stale as Google deprecates them. Resolve
+  // once via listModels() and cache for the session lifetime.
+  let model = storedModel;
+  if (providerName === 'gemini') {
+    if (!resolvedModelCache.has(providerName)) {
+      const available = await provider.listModels();
+      const flash = available.find(m => m.includes('flash')) ?? available[0];
+      if (flash) resolvedModelCache.set(providerName, flash);
+    }
+    model = resolvedModelCache.get(providerName) ?? storedModel;
   }
 
-  // ── 2. Persist user message ───────────────────────────────────────────────
-  await addChatMessage({
-    sessionId,
-    role:    'user',
-    content: userMessage,
-  });
+  // ── 1. Load all health records as context ─────────────────────────────────
+  const { context, fhirIds } = await buildFullContext();
+
+  // ── 2. Load conversation history ──────────────────────────────────────────
+  const history = await getChatMessages(sessionId);
+  const priorMessages = history
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .reverse() // getChatMessages returns DESC; we need oldest-first
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
   // ── 3. Build messages array ───────────────────────────────────────────────
   const messages = [
     {
       role:    'system' as const,
-      content: HEALTH_SYSTEM_PROMPT + context,
+      content: SYSTEM_PROMPT + context,
     },
+    ...priorMessages,
     {
       role:    'user' as const,
       content: userMessage,
     },
   ];
 
-  // ── 4. Call LLM ───────────────────────────────────────────────────────────
+  // ── 4. Persist user message ───────────────────────────────────────────────
+  await addChatMessage({
+    sessionId,
+    role:    'user',
+    content: userMessage,
+  });
+
+  // ── 5. Call LLM ───────────────────────────────────────────────────────────
   let assistantMessage = '';
 
   if (onChunk) {
-    // Streaming mode
-    const stream = provider.stream({ messages, model, temperature: 0.3 });
+    const stream = provider.stream({ messages, model, temperature: 0.4 });
     for await (const chunk of stream) {
       if (chunk.delta) {
         assistantMessage += chunk.delta;
@@ -97,10 +113,10 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
       if (chunk.done) break;
     }
   } else {
-    assistantMessage = await provider.complete({ messages, model, temperature: 0.3 });
+    assistantMessage = await provider.complete({ messages, model, temperature: 0.4 });
   }
 
-  // ── 5. Persist assistant message ──────────────────────────────────────────
+  // ── 6. Persist assistant message ──────────────────────────────────────────
   await addChatMessage({
     sessionId,
     role:           'assistant',
@@ -111,13 +127,12 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   // Auto-title session from first exchange
   await _maybeSetSessionTitle(sessionId, userMessage);
 
-  // ── 6. Audit log ──────────────────────────────────────────────────────────
+  // ── 7. Audit log ──────────────────────────────────────────────────────────
   await logEvent({
     eventType: 'chat_query',
     metadata:  {
       provider:    providerName,
       model,
-      searchMode,
       fhirIdCount: fhirIds.length,
     },
   });
@@ -126,11 +141,9 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
 }
 
 async function _maybeSetSessionTitle(sessionId: string, firstMessage: string) {
-  // Truncate to a reasonable title length
   const title = firstMessage.length > 60
     ? firstMessage.slice(0, 57) + '...'
     : firstMessage;
-
   try {
     await updateChatSessionTitle(sessionId, title);
   } catch {

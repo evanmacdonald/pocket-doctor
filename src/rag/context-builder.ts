@@ -1,64 +1,61 @@
-import { getFhirResourceById } from '~/db/repositories/fhir.repository';
-import type { FtsResult } from './fts.service';
-import type { RagResult } from './rag.service';
+import { getAllFhirResources } from '~/db/repositories/fhir.repository';
 
-const MAX_CONTEXT_CHARS = 8000; // ~2k tokens at ~4 chars/token
+const MAX_FULL_CONTEXT_CHARS = 40_000; // ~10k tokens — covers even large record sets
 
 /**
- * Build a context string from FTS results to inject into the LLM prompt.
+ * Build context from ALL of the patient's health records, grouped by type.
+ * Equivalent to attaching all files to a ChatGPT / Claude conversation.
  */
-export async function buildContextFromFts(results: FtsResult[]): Promise<{
+export async function buildFullContext(): Promise<{
   context: string;
   fhirIds: string[];
 }> {
-  if (results.length === 0) {
-    return { context: 'No matching health records found.', fhirIds: [] };
+  const resources = await getAllFhirResources(500);
+
+  if (resources.length === 0) {
+    return {
+      context: 'The patient has no health records on file yet.',
+      fhirIds: [],
+    };
   }
 
+  // Group by resource type for readability
+  const byType = new Map<string, typeof resources>();
+  for (const r of resources) {
+    if (!byType.has(r.resourceType)) byType.set(r.resourceType, []);
+    byType.get(r.resourceType)!.push(r);
+  }
+
+  const SECTION_LABELS: Record<string, string> = {
+    Condition:            'Conditions & Diagnoses',
+    Observation:          'Observations & Lab Results',
+    MedicationStatement:  'Medications',
+    MedicationRequest:    'Medications',
+    AllergyIntolerance:   'Allergies',
+    Immunization:         'Immunizations',
+    Procedure:            'Procedures',
+    DiagnosticReport:     'Diagnostic Reports',
+  };
+
+  const lines: string[] = ['=== Patient Health Records ==='];
   const fhirIds: string[] = [];
-  const lines: string[] = ['--- Relevant Health Records ---'];
   let totalChars = 0;
 
-  for (const result of results) {
-    const record = await getFhirResourceById(result.fhirId);
-    if (!record) continue;
+  for (const [type, records] of byType) {
+    const label = SECTION_LABELS[type] ?? type;
+    lines.push(`\n--- ${label} ---`);
 
-    const line = formatFhirForContext(record.resourceType, record.resourceJson, record.effectiveDate);
-    if (totalChars + line.length > MAX_CONTEXT_CHARS) break;
-
-    lines.push(line);
-    fhirIds.push(result.fhirId);
-    totalChars += line.length;
+    for (const r of records) {
+      const line = formatFhirForContext(r.resourceType, r.resourceJson, r.effectiveDate);
+      if (totalChars + line.length > MAX_FULL_CONTEXT_CHARS) break;
+      lines.push(line);
+      fhirIds.push(r.id);
+      totalChars += line.length;
+    }
   }
 
-  return { context: lines.join('\n\n'), fhirIds };
-}
-
-/**
- * Build a context string from RAG (vector search) results.
- */
-export async function buildContextFromRag(results: RagResult[]): Promise<{
-  context: string;
-  fhirIds: string[];
-}> {
-  if (results.length === 0) {
-    return { context: 'No semantically similar health records found.', fhirIds: [] };
-  }
-
-  const fhirIds: string[] = [];
-  const lines: string[] = ['--- Relevant Health Records ---'];
-  let totalChars = 0;
-
-  for (const result of results) {
-    // chunkText is the pre-formatted text stored at embedding time
-    const line = result.chunkText;
-    if (totalChars + line.length > MAX_CONTEXT_CHARS) break;
-    lines.push(line);
-    fhirIds.push(result.fhirId);
-    totalChars += line.length;
-  }
-
-  return { context: lines.join('\n\n'), fhirIds };
+  lines.push('\n=== End of Records ===');
+  return { context: lines.join('\n'), fhirIds };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

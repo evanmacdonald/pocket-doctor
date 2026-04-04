@@ -24,10 +24,7 @@ export class GeminiProvider implements LLMProvider {
       {
         systemInstruction,
         contents,
-        generationConfig: {
-          maxOutputTokens: req.maxTokens ?? 4096,
-          temperature:     req.temperature ?? 0,
-        },
+        generationConfig: this._generationConfig(req),
       }
     );
 
@@ -45,17 +42,23 @@ export class GeminiProvider implements LLMProvider {
         body: JSON.stringify({
           systemInstruction,
           contents,
-          generationConfig: {
-            maxOutputTokens: req.maxTokens ?? 4096,
-            temperature:     req.temperature ?? 0,
-          },
+          generationConfig: this._generationConfig(req),
         }),
       }
     );
 
     if (!response.ok) await this._throwOnError(response);
 
-    const reader = response.body!.getReader();
+    // React Native's Hermes doesn't expose response.body as a ReadableStream —
+    // fall back to a standard complete() call in that case.
+    if (!response.body) {
+      const text = await this.complete(req);
+      yield { delta: text, done: false };
+      yield { delta: '', done: true };
+      return;
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -155,6 +158,13 @@ export class GeminiProvider implements LLMProvider {
         ? { parts: [{ text: systemMsg.content }] }
         : undefined,
       contents,
+    };
+  }
+
+  private _generationConfig(req: ChatCompletionRequest) {
+    return {
+      maxOutputTokens: req.maxTokens ?? 4096,
+      temperature:     req.temperature ?? 0,
     };
   }
 
