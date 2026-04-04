@@ -25,9 +25,18 @@ export async function ftsSearch(
 
   const sqlite = getSQLite();
 
-  // Sanitize: FTS5 special chars that can break syntax if unescaped
-  const safeQuery = query.replace(/["*()]/g, ' ').trim();
-  if (!safeQuery) return [];
+  // Sanitize: strip FTS5 special chars that break syntax
+  const sanitized = query.replace(/["*()?\-^:,;!]/g, ' ').trim();
+  if (!sanitized) return [];
+
+  // FTS5 ANDs space-separated terms — natural language questions fail because
+  // words like "What", "do", "I" won't appear in records. OR the terms so any
+  // keyword match surfaces the document.
+  // Single-char words ("I", "a") are noise in medical queries — skip them.
+  const MIN_TERM_LENGTH = 2;
+  const terms = sanitized.split(/\s+/).filter(w => w.length >= MIN_TERM_LENGTH);
+  if (terms.length === 0) return [];
+  const safeQuery = terms.join(' OR ');
 
   const rows = await sqlite.getAllAsync<{
     resource_id:   string;
