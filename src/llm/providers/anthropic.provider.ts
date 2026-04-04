@@ -47,7 +47,14 @@ export class AnthropicProvider implements LLMProvider {
 
     if (!response.ok) await this._throwOnError(response);
 
-    const reader = response.body!.getReader();
+    if (!response.body) {
+      const text = await this.complete(req);
+      yield { delta: text, done: false };
+      yield { delta: '', done: true };
+      return;
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -85,21 +92,12 @@ export class AnthropicProvider implements LLMProvider {
 
   async validateKey(apiKey: string): Promise<boolean> {
     try {
-      // Send a minimal message to validate the key
-      const res = await fetch(`${BASE_URL}/messages`, {
-        method: 'POST',
+      const res = await fetch(`${BASE_URL}/models`, {
         headers: {
-          'Content-Type':       'application/json',
-          'x-api-key':          apiKey,
-          'anthropic-version':  API_VERSION,
+          'x-api-key':         apiKey,
+          'anthropic-version': API_VERSION,
         },
-        body: JSON.stringify({
-          model:      'claude-3-5-haiku-latest',
-          max_tokens: 1,
-          messages:   [{ role: 'user', content: 'hi' }],
-        }),
       });
-      // 200 = valid, 401 = invalid key, 400 = valid key but bad request is fine too
       return res.status !== 401;
     } catch {
       return false;
@@ -107,12 +105,23 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async listModels(): Promise<string[]> {
-    // Anthropic doesn't have a public list models endpoint; return known models
+    try {
+      const res = await fetch(`${BASE_URL}/models`, {
+        headers: this._headers(),
+      });
+      if (!res.ok) return this._fallbackModels();
+      const data = await res.json();
+      return (data.data as { id: string }[]).map((m) => m.id);
+    } catch {
+      return this._fallbackModels();
+    }
+  }
+
+  private _fallbackModels(): string[] {
     return [
       'claude-opus-4-5',
       'claude-sonnet-4-5',
-      'claude-3-5-haiku-20241022',
-      'claude-3-7-sonnet-20250219',
+      'claude-haiku-4-5-20251001',
     ];
   }
 

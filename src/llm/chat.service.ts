@@ -58,17 +58,27 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     );
   }
 
-  // For Gemini, stored model names go stale as Google deprecates them. Resolve
-  // once via listModels() and cache for the session lifetime.
+  // Stored model names go stale as providers deprecate them. Verify the stored
+  // model is still available and fall back to the best available if not.
+  // Result is cached per provider to avoid a listModels() call on every message.
   let model = storedModel;
-  if (providerName === 'gemini') {
-    if (!resolvedModelCache.has(providerName)) {
-      const available = await provider.listModels();
-      const flash = available.find(m => m.includes('flash')) ?? available[0];
-      if (flash) resolvedModelCache.set(providerName, flash);
+  if (!resolvedModelCache.has(providerName)) {
+    const available = await provider.listModels();
+    if (available.length > 0) {
+      const stored = available.find(m => m === storedModel);
+      if (stored) {
+        resolvedModelCache.set(providerName, stored);
+      } else {
+        // Prefer a flash/haiku tier model, otherwise take first available
+        const preferred =
+          available.find(m => m.includes('flash')) ??
+          available.find(m => m.includes('haiku')) ??
+          available[0];
+        resolvedModelCache.set(providerName, preferred);
+      }
     }
-    model = resolvedModelCache.get(providerName) ?? storedModel;
   }
+  model = resolvedModelCache.get(providerName) ?? storedModel;
 
   // ── 1. Load all health records as context ─────────────────────────────────
   const { context, fhirIds } = await buildFullContext();

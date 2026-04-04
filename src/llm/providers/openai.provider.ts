@@ -42,7 +42,14 @@ export class OpenAIProvider implements LLMProvider {
 
     if (!response.ok) await this._throwOnError(response);
 
-    const reader = response.body!.getReader();
+    if (!response.body) {
+      const text = await this.complete(req);
+      yield { delta: text, done: false };
+      yield { delta: '', done: true };
+      return;
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
