@@ -59,6 +59,8 @@ export async function getChatMessages(sessionId: string) {
 
 export async function deleteChatSession(id: string) {
   const db = getDatabase();
-  // Messages cascade via ON DELETE CASCADE
+  // Delete messages first — existing devices may have the table without ON DELETE CASCADE
+  // (the raw CREATE TABLE IF NOT EXISTS won't alter an already-created table).
+  await db.delete(chatMessages).where(eq(chatMessages.sessionId, id));
   await db.delete(chatSessions).where(eq(chatSessions.id, id));
 }

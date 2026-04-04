@@ -73,7 +73,7 @@ export async function openDatabase() {
   await _sqlite.execAsync(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id                TEXT PRIMARY KEY,
-      session_id        TEXT NOT NULL REFERENCES chat_sessions(id),
+      session_id        TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
       role              TEXT NOT NULL,
       content           TEXT NOT NULL,
       context_fhir_ids  TEXT,
