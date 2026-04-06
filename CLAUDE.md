@@ -1,4 +1,5 @@
 # Pocket Doctor — Claude Instructions
+<!-- test: CI/CD setup verification -->
 
 ## Project Overview
 Local-first iOS health record app built with Expo (React Native). All data lives on-device in SQLite. Users bring their own LLM API key (OpenAI / Anthropic / Gemini). Zero backend, zero server cost. MIT licensed.
