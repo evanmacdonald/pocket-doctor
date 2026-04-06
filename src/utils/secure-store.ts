@@ -7,10 +7,12 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESSIBILITY = SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY;
 
 export const SecureKeys = {
-  OPENAI_API_KEY:    'apikey_openai',
-  ANTHROPIC_API_KEY: 'apikey_anthropic',
-  GEMINI_API_KEY:    'apikey_gemini',
-  PORTAL_TOKEN_KEY:  'portal_token_encryption_key',  // AES key for portal tokens
+  ACTIVE_API_KEY:   'apikey_active',                 // Single active provider key
+  PORTAL_TOKEN_KEY: 'portal_token_encryption_key',   // AES key for portal tokens
+  // Migration-only — read and delete on first launch, never written after migration
+  _LEGACY_OPENAI_KEY:    'apikey_openai',
+  _LEGACY_ANTHROPIC_KEY: 'apikey_anthropic',
+  _LEGACY_GEMINI_KEY:    'apikey_gemini',
 } as const;
 
 export type SecureKey = (typeof SecureKeys)[keyof typeof SecureKeys];

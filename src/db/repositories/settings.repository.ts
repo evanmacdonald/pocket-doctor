@@ -5,7 +5,7 @@ import { appSettings } from '../schema';
 // ─── Typed setting keys ───────────────────────────────────────────────────────
 
 export type SearchMode = 'fts' | 'rag';
-export type ProviderName = 'openai' | 'anthropic' | 'gemini';
+export type ProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
 
 export interface AppSettingsMap {
   search_mode:               SearchMode;
@@ -15,6 +15,8 @@ export interface AppSettingsMap {
   embedding_dimensions:      number;
   has_completed_onboarding:  boolean;
   auto_lock_seconds:         number;
+  custom_base_url:           string;    // base URL for custom OpenAI-compatible provider
+  has_migrated_api_key:      boolean;   // one-time migration guard from legacy per-provider keys
 }
 
 const DEFAULTS: AppSettingsMap = {
@@ -25,6 +27,8 @@ const DEFAULTS: AppSettingsMap = {
   embedding_dimensions:     1536,
   has_completed_onboarding: false,
   auto_lock_seconds:        300, // 5 minutes
+  custom_base_url:          '',
+  has_migrated_api_key:     false,
 };
 
 export async function getSetting<K extends keyof AppSettingsMap>(

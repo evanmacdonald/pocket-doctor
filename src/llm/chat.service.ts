@@ -2,8 +2,13 @@ import { providerRegistry } from './provider-registry';
 import { getSetting } from '~/db/repositories/settings.repository';
 
 // Cached resolved model per provider — avoids a listModels() network call on every message.
-// Invalidated by providerRegistry.invalidate() when keys change (handled externally).
+// Call clearModelCache() alongside providerRegistry.invalidate() when the active config changes.
 const resolvedModelCache = new Map<string, string>();
+
+/** Clear the resolved model cache. Call this whenever the active provider or key changes. */
+export function clearModelCache(): void {
+  resolvedModelCache.clear();
+}
 import { buildFullContext } from '~/rag/context-builder';
 import { addChatMessage, getChatMessages, updateChatSessionTitle } from '~/db/repositories/chat.repository';
 import { logEvent } from '~/db/repositories/audit.repository';

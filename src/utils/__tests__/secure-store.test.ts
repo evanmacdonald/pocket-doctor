@@ -18,10 +18,10 @@ describe('secure-store helpers', () => {
 
   describe('setSecureItem()', () => {
     it('delegates to SecureStore.setItemAsync with keychainAccessible option', async () => {
-      await setSecureItem(SecureKeys.OPENAI_API_KEY, 'sk-test');
+      await setSecureItem(SecureKeys.ACTIVE_API_KEY, 'sk-test');
       expect(MockSecureStore.setItemAsync).toHaveBeenCalledTimes(1);
       expect(MockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        'apikey_openai',
+        'apikey_active',
         'sk-test',
         expect.objectContaining({ keychainAccessible: expect.anything() })
       );
@@ -39,20 +39,20 @@ describe('secure-store helpers', () => {
 
   describe('getSecureItem()', () => {
     it('returns the stored value', async () => {
-      await MockSecureStore.setItemAsync('apikey_anthropic', 'sk-ant-test', {});
-      const result = await getSecureItem(SecureKeys.ANTHROPIC_API_KEY);
-      expect(result).toBe('sk-ant-test');
+      await MockSecureStore.setItemAsync('apikey_active', 'sk-test', {});
+      const result = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+      expect(result).toBe('sk-test');
     });
 
     it('returns null when the key has not been set', async () => {
-      const result = await getSecureItem(SecureKeys.GEMINI_API_KEY);
+      const result = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
       expect(result).toBeNull();
     });
   });
 
   describe('deleteSecureItem()', () => {
     it('delegates to SecureStore.deleteItemAsync with keychainAccessible option', async () => {
-      await deleteSecureItem(SecureKeys.GEMINI_API_KEY);
+      await deleteSecureItem(SecureKeys._LEGACY_GEMINI_KEY);
       expect(MockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
         'apikey_gemini',
         expect.objectContaining({ keychainAccessible: expect.anything() })
@@ -60,9 +60,9 @@ describe('secure-store helpers', () => {
     });
 
     it('stored value is gone after delete', async () => {
-      await setSecureItem(SecureKeys.OPENAI_API_KEY, 'sk-test');
-      await deleteSecureItem(SecureKeys.OPENAI_API_KEY);
-      const result = await getSecureItem(SecureKeys.OPENAI_API_KEY);
+      await setSecureItem(SecureKeys.ACTIVE_API_KEY, 'sk-test');
+      await deleteSecureItem(SecureKeys.ACTIVE_API_KEY);
+      const result = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
       expect(result).toBeNull();
     });
   });

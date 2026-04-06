@@ -2,7 +2,10 @@
 // All three providers implement LLMProvider. Callers never talk to a specific
 // provider directly — they use the registry to get the active provider.
 
-export type LLMProviderName = 'openai' | 'anthropic' | 'gemini';
+export type LLMProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
+
+/** Providers that support vector embeddings (used for RAG/Smart Search) */
+export const PROVIDERS_WITH_EMBEDDING_SUPPORT: LLMProviderName[] = ['openai', 'gemini'];
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -85,6 +88,7 @@ export const DEFAULT_MODELS: Record<LLMProviderName, string> = {
   openai:    'gpt-4o-mini',
   anthropic: 'claude-3-5-haiku-latest',
   gemini:    'gemini-1.5-flash',
+  custom:    '',  // no default — user must select after validation
 };
 
 // Default embedding models per provider (Anthropic doesn't support embeddings)
