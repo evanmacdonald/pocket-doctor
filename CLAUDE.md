@@ -1,5 +1,8 @@
 # Pocket Doctor — Claude Instructions
 
+## Git Workflow Rules
+- **Always submit changes as a PR.** Never directly merge or push to main. This applies even when the user says "ship it", "commit it", or similar — always create a PR instead.
+
 ## Project Overview
 Local-first iOS health record app built with Expo (React Native). All data lives on-device in SQLite. Users bring their own LLM API key (OpenAI / Anthropic / Gemini). Zero backend, zero server cost. MIT licensed.
 
