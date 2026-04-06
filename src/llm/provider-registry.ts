@@ -1,68 +1,87 @@
 import { getSecureItem, SecureKeys } from '~/utils/secure-store';
+import { getSetting } from '~/db/repositories/settings.repository';
 import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { CustomProvider } from './providers/custom.provider';
 import type { LLMProvider, LLMProviderName } from './types';
 
 // ─── Provider Registry ────────────────────────────────────────────────────────
-// Lazily instantiates providers from API keys stored in iOS Keychain.
-// Invalidate the cache when a key is added/removed (call invalidate()).
+// Single active provider backed by one Keychain entry (apikey_active).
+// The active provider name is stored in SQLite settings (active_provider).
+// Invalidate the cache when the key or provider changes (call invalidate()).
 
 class ProviderRegistry {
-  private _cache = new Map<LLMProviderName, LLMProvider>();
+  private _cached: LLMProvider | null = null;
+  private _cachedProviderName: LLMProviderName | null = null;
 
   /**
    * Get a provider by name.
-   * Returns null if no API key is configured for that provider.
+   * Returns null if no key is configured or if `name` does not match the
+   * currently active provider.
    */
   async getProvider(name: LLMProviderName): Promise<LLMProvider | null> {
-    if (this._cache.has(name)) {
-      return this._cache.get(name)!;
+    if (this._cached && this._cachedProviderName === name) {
+      return this._cached;
     }
 
-    const key = await this._getKey(name);
-    if (!key) return null;
+    const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+    if (!apiKey) return null;
 
-    const provider = this._createProvider(name, key);
-    this._cache.set(name, provider);
+    const activeProvider = await getSetting('active_provider') as LLMProviderName;
+    if (activeProvider !== name) return null;
+
+    const provider = await this._createProvider(name, apiKey);
+    this._cached = provider;
+    this._cachedProviderName = name;
     return provider;
   }
 
   /**
-   * Returns the list of provider names that have API keys configured.
+   * Get the currently active provider without needing to know its name.
+   * Returns null if no key is configured.
+   */
+  async getActiveProvider(): Promise<LLMProvider | null> {
+    const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+    if (!apiKey) return null;
+
+    const name = await getSetting('active_provider') as LLMProviderName;
+    if (this._cached && this._cachedProviderName === name) {
+      return this._cached;
+    }
+
+    const provider = await this._createProvider(name, apiKey);
+    this._cached = provider;
+    this._cachedProviderName = name;
+    return provider;
+  }
+
+  /**
+   * Returns the active provider name in an array if a key is configured,
+   * otherwise an empty array.
    */
   async getConfiguredProviders(): Promise<LLMProviderName[]> {
-    const results: LLMProviderName[] = [];
-    for (const name of ['openai', 'anthropic', 'gemini'] as LLMProviderName[]) {
-      const key = await this._getKey(name);
-      if (key) results.push(name);
-    }
-    return results;
+    const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+    if (!apiKey) return [];
+    const name = await getSetting('active_provider') as LLMProviderName;
+    return [name];
   }
 
-  /** Clear the provider cache (call after storing a new API key) */
-  invalidate(name?: LLMProviderName) {
-    if (name) {
-      this._cache.delete(name);
-    } else {
-      this._cache.clear();
-    }
+  /** Clear the provider cache (call after storing/removing an API key) */
+  invalidate(_name?: LLMProviderName) {
+    this._cached = null;
+    this._cachedProviderName = null;
   }
 
-  private async _getKey(name: LLMProviderName): Promise<string | null> {
-    const keyMap: Record<LLMProviderName, typeof SecureKeys[keyof typeof SecureKeys]> = {
-      openai:    SecureKeys.OPENAI_API_KEY,
-      anthropic: SecureKeys.ANTHROPIC_API_KEY,
-      gemini:    SecureKeys.GEMINI_API_KEY,
-    };
-    return getSecureItem(keyMap[name]);
-  }
-
-  private _createProvider(name: LLMProviderName, apiKey: string): LLMProvider {
+  private async _createProvider(name: LLMProviderName, apiKey: string): Promise<LLMProvider> {
     switch (name) {
       case 'openai':    return new OpenAIProvider(apiKey);
       case 'anthropic': return new AnthropicProvider(apiKey);
       case 'gemini':    return new GeminiProvider(apiKey);
+      case 'custom': {
+        const baseUrl = await getSetting('custom_base_url');
+        return new CustomProvider(apiKey, baseUrl);
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { openDatabase } from '~/db/client';
+import { migrateApiKeysIfNeeded } from '~/llm/migrate-api-keys';
 import { biometricService } from '~/auth/biometric.service';
 
 export { ErrorBoundary } from 'expo-router';
@@ -27,6 +28,7 @@ export default function RootLayout() {
   // Initialize database on first load
   useEffect(() => {
     openDatabase()
+      .then(() => migrateApiKeysIfNeeded())
       .then(() => setDbReady(true))
       .catch((e) => { throw e; });
   }, []);

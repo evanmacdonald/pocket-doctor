@@ -1,6 +1,10 @@
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { getSecureItem, SecureKeys } from '~/utils/secure-store';
+import { getSetting } from '~/db/repositories/settings.repository';
+import type { LLMProviderName } from '~/llm/types';
 
 interface SettingsRowProps {
   label: string;
@@ -45,7 +49,41 @@ function Divider() {
   );
 }
 
+const PROVIDER_LABEL: Record<LLMProviderName, string> = {
+  openai:    'OpenAI',
+  anthropic: 'Anthropic',
+  gemini:    'Google',
+  custom:    'Custom',
+};
+
 export default function SettingsScreen() {
+  const [activeProvider, setActiveProvider] = useState<LLMProviderName | null>(null);
+  const [activeModel,    setActiveModel]    = useState<string>('');
+  const [searchMode,     setSearchMode]     = useState<'fts' | 'rag'>('fts');
+
+  useFocusEffect(
+    useCallback(() => {
+      async function loadSettings() {
+        const [key, provider, model, mode] = await Promise.all([
+          getSecureItem(SecureKeys.ACTIVE_API_KEY),
+          getSetting('active_provider') as Promise<LLMProviderName>,
+          getSetting('active_model'),
+          getSetting('search_mode'),
+        ]);
+        setActiveProvider(key ? provider : null);
+        setActiveModel(key ? model : '');
+        setSearchMode(mode);
+      }
+      loadSettings();
+    }, [])
+  );
+
+  const providerSubtitle = activeProvider && activeModel
+    ? `${PROVIDER_LABEL[activeProvider]} · ${activeModel}`
+    : activeProvider
+      ? PROVIDER_LABEL[activeProvider]
+      : 'Not configured';
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-950" edges={['bottom']}>
       <ScrollView className="flex-1">
@@ -53,20 +91,15 @@ export default function SettingsScreen() {
         <SectionHeader title="AI & Chat" />
         <View className="rounded-xl overflow-hidden mx-4 border border-gray-100 dark:border-gray-800">
           <SettingsRow
-            label="API Keys"
-            subtitle="OpenAI, Anthropic, or Gemini"
+            label="AI Provider"
+            subtitle={providerSubtitle}
             onPress={() => router.push('/settings/api-keys')}
           />
           <Divider />
           <SettingsRow
             label="Search Mode"
             subtitle="Smart (RAG) or keyword search"
-            value="Keyword"
-          />
-          <Divider />
-          <SettingsRow
-            label="Active Model"
-            value="gpt-4o-mini"
+            value={searchMode === 'rag' ? 'Smart (RAG)' : 'Keyword'}
           />
         </View>
 
