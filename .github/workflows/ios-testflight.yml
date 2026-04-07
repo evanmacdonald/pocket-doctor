@@ -41,16 +41,14 @@ jobs:
       - name: EAS build + auto-submit to TestFlight
         id: eas
         run: |
-          set -euo pipefail
-          OUTPUT=$(eas build \
+          set -o pipefail
+          eas build \
             --platform ios \
             --profile preview \
             --non-interactive \
             --auto-submit \
-            --submit-profile preview \
-            --json)
-          echo "$OUTPUT"
-          BUILD_URL=$(echo "$OUTPUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Array.isArray(j)?j[0].buildDetailsPageUrl:j.buildDetailsPageUrl)})")
+            --submit-profile preview 2>&1 | tee eas-build.log
+          BUILD_URL=$(grep -oE 'https://expo\.dev/[^ )]+/builds/[a-f0-9-]+' eas-build.log | head -n1 || true)
           echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR with build link
