@@ -28,14 +28,14 @@
   "submit": {
     "preview": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_ASC_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+        "ascAppId": "6761785039",
+        "appleTeamId": "NU98D7J463"
       }
     },
     "production": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_ASC_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+        "ascAppId": "6761785039",
+        "appleTeamId": "NU98D7J463"
       }
     }
   }
