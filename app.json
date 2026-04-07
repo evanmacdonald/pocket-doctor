@@ -16,6 +16,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pocketdoctor.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Pocket Doctor uses Face ID to protect your health records.",
         "NSCameraUsageDescription": "Pocket Doctor uses the camera to scan health documents.",

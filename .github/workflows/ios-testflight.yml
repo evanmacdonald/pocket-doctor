@@ -1,0 +1,67 @@
+name: iOS TestFlight (PR preview)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ios-testflight-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & upload to TestFlight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test:ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: EAS build + auto-submit to TestFlight
+        id: eas
+        run: |
+          set -euo pipefail
+          OUTPUT=$(eas build \
+            --platform ios \
+            --profile preview \
+            --non-interactive \
+            --auto-submit \
+            --submit-profile preview \
+            --json \
+            --no-wait)
+          echo "$OUTPUT"
+          BUILD_URL=$(echo "$OUTPUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Array.isArray(j)?j[0].buildDetailsPageUrl:j.buildDetailsPageUrl)})")
+          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR with build link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = "${{ steps.eas.outputs.build_url }}";
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `iOS TestFlight build started: ${url}\n\nOnce it finishes uploading, it will appear in TestFlight automatically.`
+            });
