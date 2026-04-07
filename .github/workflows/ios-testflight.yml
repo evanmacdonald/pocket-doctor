@@ -48,8 +48,7 @@ jobs:
             --non-interactive \
             --auto-submit \
             --submit-profile preview \
-            --json \
-            --no-wait)
+            --json)
           echo "$OUTPUT"
           BUILD_URL=$(echo "$OUTPUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Array.isArray(j)?j[0].buildDetailsPageUrl:j.buildDetailsPageUrl)})")
           echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
