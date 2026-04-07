@@ -32,7 +32,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.pocketdoctor.app"
+      "package": "com.pocketdoctor.app",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -62,6 +68,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9a917898-2af6-4ebb-aca5-db3fdc2dfd2b"
+      }
+    },
+    "owner": "evan.m.macdonald"
   }
 }
