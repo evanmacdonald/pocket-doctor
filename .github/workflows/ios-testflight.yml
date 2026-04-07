@@ -46,8 +46,7 @@ jobs:
             --platform ios \
             --profile preview \
             --non-interactive \
-            --auto-submit \
-            --submit-profile preview 2>&1 | tee eas-build.log
+            --auto-submit 2>&1 | tee eas-build.log
           BUILD_URL=$(grep -oE 'https://expo\.dev/[^ )]+/builds/[a-f0-9-]+' eas-build.log | head -n1 || true)
           echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
 
