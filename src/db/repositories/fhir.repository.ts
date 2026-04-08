@@ -1,8 +1,8 @@
 import { eq, desc, and } from 'drizzle-orm';
-import { getDatabase, indexFhirResourceFts, removeFhirResourceFts } from '../client';
+import { getDatabase } from '../client';
 import { fhirResources, NewFhirResource, FhirResource } from '../schema';
 import { uuid } from '~/utils/uuid';
-import { fingerprintResource, extractTextContent } from './fhir.utils';
+import { fingerprintResource } from './fhir.utils';
 
 // ─── Repository ───────────────────────────────────────────────────────────────
 
@@ -40,10 +40,6 @@ export async function upsertFhirResource(
       target: fhirResources.id,
       set: { resourceJson: row.resourceJson, updatedAt: now, isDeleted: 0 },
     });
-
-  // Keep FTS index in sync
-  const textContent = extractTextContent(row.resourceJson, row.resourceType);
-  await indexFhirResourceFts(id, row.resourceType, textContent);
 
   const saved = await db.query.fhirResources.findFirst({ where: eq(fhirResources.id, id) });
   if (!saved) throw new Error(`Failed to retrieve FHIR resource after upsert: ${id}`);
@@ -87,5 +83,4 @@ export async function softDeleteFhirResource(id: string): Promise<void> {
     .update(fhirResources)
     .set({ isDeleted: 1, updatedAt: Date.now() })
     .where(eq(fhirResources.id, id));
-  await removeFhirResourceFts(id);
 }

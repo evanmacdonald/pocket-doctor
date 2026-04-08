@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -59,20 +59,17 @@ const PROVIDER_LABEL: Record<LLMProviderName, string> = {
 export default function SettingsScreen() {
   const [activeProvider, setActiveProvider] = useState<LLMProviderName | null>(null);
   const [activeModel,    setActiveModel]    = useState<string>('');
-  const [searchMode,     setSearchMode]     = useState<'fts' | 'rag'>('fts');
 
   useFocusEffect(
     useCallback(() => {
       async function loadSettings() {
-        const [key, provider, model, mode] = await Promise.all([
+        const [key, provider, model] = await Promise.all([
           getSecureItem(SecureKeys.ACTIVE_API_KEY),
           getSetting('active_provider') as Promise<LLMProviderName>,
           getSetting('active_model'),
-          getSetting('search_mode'),
         ]);
         setActiveProvider(key ? provider : null);
         setActiveModel(key ? model : '');
-        setSearchMode(mode);
       }
       loadSettings();
     }, [])
@@ -94,12 +91,6 @@ export default function SettingsScreen() {
             label="AI Provider"
             subtitle={providerSubtitle}
             onPress={() => router.push('/settings/api-keys')}
-          />
-          <Divider />
-          <SettingsRow
-            label="Search Mode"
-            subtitle="Smart (RAG) or keyword search"
-            value={searchMode === 'rag' ? 'Smart (RAG)' : 'Keyword'}
           />
         </View>
 

@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { getDatabase, getSQLite, indexFhirResourceFts } from '~/db/client';
+import { getDatabase, getSQLite } from '~/db/client';
 import {
   fhirResources, documents, chatSessions, chatMessages, appSettings,
 } from '~/db/schema';
@@ -71,7 +71,6 @@ export async function importHealthData(
     await sqlite.execAsync('DELETE FROM chat_messages');
     await sqlite.execAsync('DELETE FROM chat_sessions');
     await sqlite.execAsync('DELETE FROM fhir_resources');
-    await sqlite.execAsync('DELETE FROM fhir_resources_fts');
     await sqlite.execAsync('DELETE FROM documents');
     await sqlite.execAsync('DELETE FROM app_settings');
   }
@@ -83,11 +82,6 @@ export async function importHealthData(
     try {
       await db.insert(fhirResources).values(row as typeof fhirResources.$inferInsert)
         .onConflictDoNothing();
-      // Re-index FTS
-      const r = row as { id: string; resource_type: string; resource_json: string };
-      if (r.id && r.resource_type) {
-        await indexFhirResourceFts(r.id, r.resource_type, r.resource_json ?? '');
-      }
     } catch { /* skip invalid rows */ }
   }
 

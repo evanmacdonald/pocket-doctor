@@ -4,15 +4,11 @@ import { appSettings } from '../schema';
 
 // ─── Typed setting keys ───────────────────────────────────────────────────────
 
-export type SearchMode = 'fts' | 'rag';
 export type ProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
 
 export interface AppSettingsMap {
-  search_mode:               SearchMode;
   active_provider:           ProviderName;
   active_model:              string;
-  embedding_model:           string;
-  embedding_dimensions:      number;
   has_completed_onboarding:  boolean;
   auto_lock_seconds:         number;
   custom_base_url:           string;    // base URL for custom OpenAI-compatible provider
@@ -20,11 +16,8 @@ export interface AppSettingsMap {
 }
 
 const DEFAULTS: AppSettingsMap = {
-  search_mode:              'fts',
   active_provider:          'openai',
   active_model:             'gpt-4o-mini',
-  embedding_model:          'text-embedding-3-small',
-  embedding_dimensions:     1536,
   has_completed_onboarding: false,
   auto_lock_seconds:        300, // 5 minutes
   custom_base_url:          '',

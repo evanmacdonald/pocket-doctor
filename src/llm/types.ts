@@ -4,9 +4,6 @@
 
 export type LLMProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
 
-/** Providers that support vector embeddings (used for RAG/Smart Search) */
-export const PROVIDERS_WITH_EMBEDDING_SUPPORT: LLMProviderName[] = ['openai', 'gemini'];
-
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -89,18 +86,4 @@ export const DEFAULT_MODELS: Record<LLMProviderName, string> = {
   anthropic: 'claude-3-5-haiku-latest',
   gemini:    'gemini-1.5-flash',
   custom:    '',  // no default — user must select after validation
-};
-
-// Default embedding models per provider (Anthropic doesn't support embeddings)
-export const DEFAULT_EMBEDDING_MODELS: Partial<Record<LLMProviderName, string>> = {
-  openai:  'text-embedding-3-small',  // 1536 dims
-  gemini:  'text-embedding-004',       // 768 dims
-};
-
-// Vector dimensions per embedding model
-export const EMBEDDING_DIMENSIONS: Record<string, number> = {
-  'text-embedding-3-small': 1536,
-  'text-embedding-3-large': 3072,
-  'text-embedding-ada-002': 1536,
-  'text-embedding-004':     768,
 };

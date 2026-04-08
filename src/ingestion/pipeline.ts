@@ -9,9 +9,7 @@ import { getDatabase } from '~/db/client';
 import { documents } from '~/db/schema';
 import { upsertFhirResource } from '~/db/repositories/fhir.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
-import { getSetting } from '~/db/repositories/settings.repository';
 import { normalizeTextToFhir, normalizePdfToFhir } from './normalizers/fhir.normalizer';
-import { embedFhirResource } from '~/rag/rag.service';
 import { ingestionQueue } from './queue';
 import { uuid } from '~/utils/uuid';
 import { eq } from 'drizzle-orm';
@@ -153,27 +151,17 @@ async function _processDocument(
     }
 
     // ── Step 3: Store FHIR resources ──────────────────────────────────────
-    const searchMode = await getSetting('search_mode');
-
     for (const entry of fhirEntries) {
       const resource = entry.resource;
       if (!resource?.resourceType) continue;
 
       const effectiveDate = _extractEffectiveDate(resource);
-      const fhirRecord = await upsertFhirResource({
+      await upsertFhirResource({
         resourceType:     resource.resourceType,
         resourceJson:     JSON.stringify(resource),
         sourceDocumentId: docId,
         effectiveDate,
       });
-
-      // ── Step 4: Generate embeddings if RAG mode is on ─────────────────
-      if (searchMode === 'rag') {
-        const chunkText = JSON.stringify(resource).slice(0, 2000);
-        await embedFhirResource(fhirRecord.id, chunkText).catch(() => {
-          // Embedding failure is non-fatal — FTS still works
-        });
-      }
     }
 
     await _setStatus(docId, 'done');

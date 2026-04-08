@@ -5,7 +5,7 @@ jest.mock('~/db/repositories/settings.repository', () => ({
 jest.mock('~/llm/provider-registry', () => ({
   providerRegistry: { getProvider: jest.fn() },
 }));
-jest.mock('~/rag/context-builder', () => ({
+jest.mock('~/llm/context-builder', () => ({
   buildFullContext: jest.fn(),
 }));
 jest.mock('~/db/repositories/chat.repository', () => ({
@@ -20,7 +20,7 @@ jest.mock('~/db/repositories/audit.repository', () => ({
 import { sendMessage } from '../chat.service';
 import { getSetting }  from '~/db/repositories/settings.repository';
 import { providerRegistry } from '~/llm/provider-registry';
-import { buildFullContext } from '~/rag/context-builder';
+import { buildFullContext } from '~/llm/context-builder';
 import {
   getChatMessages,
   addChatMessage,

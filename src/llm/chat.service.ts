@@ -9,7 +9,7 @@ const resolvedModelCache = new Map<string, string>();
 export function clearModelCache(): void {
   resolvedModelCache.clear();
 }
-import { buildFullContext } from '~/rag/context-builder';
+import { buildFullContext } from './context-builder';
 import { addChatMessage, getChatMessages, updateChatSessionTitle } from '~/db/repositories/chat.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
 import type { LLMProviderName } from './types';

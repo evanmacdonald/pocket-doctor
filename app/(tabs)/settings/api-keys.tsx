@@ -17,43 +17,40 @@ import { GeminiProvider } from '~/llm/providers/gemini.provider';
 import { CustomProvider } from '~/llm/providers/custom.provider';
 import {
   DEFAULT_MODELS,
-  DEFAULT_EMBEDDING_MODELS,
-  EMBEDDING_DIMENSIONS,
-  PROVIDERS_WITH_EMBEDDING_SUPPORT,
   type LLMProviderName,
 } from '~/llm/types';
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
 const PROVIDER_META: Record<LLMProviderName, {
-  label:      string;
-  hint:       string;
-  docUrl:     string;
-  supportsRag: boolean;
+  label:   string;
+  hint:    string;
+  docUrl:  string;
+  subtitle: string;
 }> = {
   openai: {
-    label:       'OpenAI',
-    hint:        'sk-...',
-    docUrl:      'https://platform.openai.com/api-keys',
-    supportsRag: true,
+    label:    'OpenAI',
+    hint:     'sk-...',
+    docUrl:   'https://platform.openai.com/api-keys',
+    subtitle: 'GPT-4o, GPT-4o mini',
   },
   anthropic: {
-    label:       'Anthropic',
-    hint:        'sk-ant-...',
-    docUrl:      'https://console.anthropic.com/settings/keys',
-    supportsRag: false,
+    label:    'Anthropic',
+    hint:     'sk-ant-...',
+    docUrl:   'https://console.anthropic.com/settings/keys',
+    subtitle: 'Claude 3.5, Claude 3 Haiku',
   },
   gemini: {
-    label:       'Google',
-    hint:        'AIza...',
-    docUrl:      'https://aistudio.google.com/app/apikey',
-    supportsRag: true,
+    label:    'Google',
+    hint:     'AIza...',
+    docUrl:   'https://aistudio.google.com/app/apikey',
+    subtitle: 'Gemini 2.0, Gemini 1.5',
   },
   custom: {
-    label:       'Custom',
-    hint:        'API key...',
-    docUrl:      '',
-    supportsRag: false,
+    label:    'Custom',
+    hint:     'API key...',
+    docUrl:   '',
+    subtitle: 'OpenAI-compatible',
   },
 };
 
@@ -173,9 +170,6 @@ export default function ApiKeysScreen() {
             await deleteSecureItem(SecureKeys.ACTIVE_API_KEY);
             if (activeProvider === 'custom') {
               await setSetting('custom_base_url', '');
-            }
-            if (activeProvider && !PROVIDERS_WITH_EMBEDDING_SUPPORT.includes(activeProvider)) {
-              await setSetting('search_mode', 'fts');
             }
             providerRegistry.invalidate();
             clearModelCache();
@@ -302,23 +296,6 @@ export default function ApiKeysScreen() {
         await setSetting('custom_base_url', baseUrlInput.trim());
       }
 
-      // Force keyword search for providers without embedding support
-      if (!PROVIDERS_WITH_EMBEDDING_SUPPORT.includes(selectedProvider)) {
-        await setSetting('search_mode', 'fts');
-      }
-
-      // Keep embedding settings consistent when switching to a supported provider
-      if (PROVIDERS_WITH_EMBEDDING_SUPPORT.includes(selectedProvider)) {
-        const embModel = DEFAULT_EMBEDDING_MODELS[selectedProvider];
-        if (embModel) {
-          await setSetting('embedding_model', embModel);
-          const dims = EMBEDDING_DIMENSIONS[embModel];
-          if (dims) await setSetting('embedding_dimensions', dims);
-          // Note: existing sqlite-vec rows remain at old dimensions until the user
-          // triggers a re-index. A future "Reindex embeddings" option should handle this.
-        }
-      }
-
       providerRegistry.invalidate();
       clearModelCache();
 
@@ -365,18 +342,11 @@ export default function ApiKeysScreen() {
 
               <View className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
                 <View className="px-4 py-4 border-b border-gray-100 dark:border-gray-800">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-2.5 h-2.5 rounded-full bg-health-green" />
-                      <Text className="font-semibold text-gray-900 dark:text-white text-base">
-                        {PROVIDER_META[activeProvider].label}
-                      </Text>
-                      {PROVIDERS_WITH_EMBEDDING_SUPPORT.includes(activeProvider) && (
-                        <View className="bg-primary-50 dark:bg-primary-950 px-2 py-0.5 rounded-full">
-                          <Text className="text-xs text-primary-600 dark:text-primary-400 font-medium">RAG</Text>
-                        </View>
-                      )}
-                    </View>
+                  <View className="flex-row items-center gap-3">
+                    <View className="w-2.5 h-2.5 rounded-full bg-health-green" />
+                    <Text className="font-semibold text-gray-900 dark:text-white text-base">
+                      {PROVIDER_META[activeProvider].label}
+                    </Text>
                   </View>
                 </View>
 
@@ -435,19 +405,9 @@ export default function ApiKeysScreen() {
                       <Text className="font-semibold text-gray-900 dark:text-white text-base mb-1">
                         {meta.label}
                       </Text>
-                      {meta.supportsRag ? (
-                        <Text className="text-xs text-primary-600 dark:text-primary-400">
-                          Supports Smart Search
-                        </Text>
-                      ) : p === 'custom' ? (
-                        <Text className="text-xs text-gray-400 dark:text-gray-500">
-                          OpenAI-compatible
-                        </Text>
-                      ) : (
-                        <Text className="text-xs text-gray-400 dark:text-gray-500">
-                          Keyword search only
-                        </Text>
-                      )}
+                      <Text className="text-xs text-gray-400 dark:text-gray-500">
+                        {meta.subtitle}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -461,15 +421,6 @@ export default function ApiKeysScreen() {
               <Pressable onPress={() => setStep('select')} className="mb-4">
                 <Text className="text-primary-600 dark:text-primary-400 text-sm">← {PROVIDER_META[selectedProvider].label}</Text>
               </Pressable>
-
-              {/* RAG notice */}
-              {!PROVIDERS_WITH_EMBEDDING_SUPPORT.includes(selectedProvider) && (
-                <View className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
-                  <Text className="text-amber-800 dark:text-amber-300 text-sm">
-                    Smart Search (RAG) requires embeddings. {PROVIDER_META[selectedProvider].label} doesn't support embeddings — keyword search will be used instead.
-                  </Text>
-                </View>
-              )}
 
               <View className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
                 <View className="px-4 py-4">

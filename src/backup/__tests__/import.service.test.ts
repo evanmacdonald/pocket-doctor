@@ -15,7 +15,7 @@ jest.mock('expo-file-system/legacy', () => ({
 }));
 
 import { importHealthData } from '../import.service';
-import { mockDb, mockSqlite, resetMockDb, indexFhirResourceFts } from '../../__mocks__/db-client';
+import { mockDb, mockSqlite, resetMockDb } from '../../__mocks__/db-client';
 import { logEvent } from '~/db/repositories/audit.repository';
 import { decrypt } from '~/backup/crypto.service';
 
@@ -105,12 +105,6 @@ describe('importHealthData()', () => {
       ([sql]: [string]) => sql.includes('DELETE')
     );
     expect(deleteCall).toBeUndefined();
-  });
-
-  it('calls indexFhirResourceFts for each restored FHIR resource', async () => {
-    setupValidPick();
-    await importHealthData('pass', 'replace');
-    expect(indexFhirResourceFts).toHaveBeenCalledWith('res-1', 'Condition', expect.any(String));
   });
 
   it('logs an import_completed audit event', async () => {
