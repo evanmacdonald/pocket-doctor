@@ -68,6 +68,11 @@ node node_modules/typescript/bin/tsc --noEmit
 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 ```
 
+## Releases
+- See `RELEASE.md` for the full pipeline. PRs auto-build to TestFlight via `.github/workflows/ios-testflight.yml`; App Store releases go through `.github/workflows/ios-release.yml` (manual workflow_dispatch).
+- **Never remove `ios.config.usesNonExemptEncryption: false` from `app.json`** — without it, every build is blocked behind the App Store Connect encryption questionnaire. Our use of AES-256-GCM for on-device backups qualifies for Apple's exemption.
+- **Never remove `image: latest` from `eas.json` `build.*.ios`** — App Store Connect requires builds compiled with the iOS 26 SDK or later (Xcode 26+). The `latest` image tracks EAS's newest macOS image which ships Xcode 26+.
+
 ## Common Gotchas
 - **`npx expo start` vs `npx expo run:ios`:** Keychain (expo-secure-store) and native modules require `run:ios`. Metro alone won't work.
 - **Ruby encoding crash in CocoaPods:** Always prefix pod commands with `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.

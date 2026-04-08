@@ -1,0 +1,36 @@
+name: iOS App Store release (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: "EAS build ID to promote to App Store (find it on expo.dev)"
+        required: true
+        type: string
+
+jobs:
+  submit:
+    name: Submit existing build to App Store
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to App Store
+        run: |
+          eas submit \
+            --platform ios \
+            --profile production \
+            --id "${{ inputs.build_id }}" \
+            --non-interactive

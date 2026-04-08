@@ -12,16 +12,29 @@
       }
     },
     "preview": {
-      "distribution": "internal",
       "ios": {
-        "simulator": false
+        "image": "latest"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "image": "latest"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "preview": {
+      "ios": {
+        "ascAppId": "6761785039",
+        "appleTeamId": "NU98D7J463"
+      }
+    },
+    "production": {
+      "ios": {
+        "ascAppId": "6761785039",
+        "appleTeamId": "NU98D7J463"
+      }
+    }
   }
 }
