@@ -11,7 +11,6 @@ describe('getSetting()', () => {
 
   it('returns the typed default when no row exists', async () => {
     (mockDb.query.appSettings.findFirst as jest.Mock).mockResolvedValueOnce(undefined);
-    expect(await getSetting('search_mode')).toBe('fts');
     expect(await getSetting('active_provider')).toBe('openai');
     expect(await getSetting('auto_lock_seconds')).toBe(300);
     expect(await getSetting('has_completed_onboarding')).toBe(false);
@@ -19,18 +18,10 @@ describe('getSetting()', () => {
 
   it('returns the stored value (JSON-parsed) when a row exists', async () => {
     (mockDb.query.appSettings.findFirst as jest.Mock).mockResolvedValue({
-      key: 'search_mode',
-      value: JSON.stringify('rag'),
+      key: 'active_provider',
+      value: JSON.stringify('gemini'),
     });
-    expect(await getSetting('search_mode')).toBe('rag');
-  });
-
-  it('returns a number setting correctly', async () => {
-    (mockDb.query.appSettings.findFirst as jest.Mock).mockResolvedValue({
-      key: 'embedding_dimensions',
-      value: JSON.stringify(768),
-    });
-    expect(await getSetting('embedding_dimensions')).toBe(768);
+    expect(await getSetting('active_provider')).toBe('gemini');
   });
 });
 
@@ -41,7 +32,7 @@ describe('setSetting()', () => {
   });
 
   it('calls insert (upsert) once', async () => {
-    await setSetting('search_mode', 'rag');
+    await setSetting('active_model', 'gpt-4o');
     expect(mockDb.insert).toHaveBeenCalledTimes(1);
   });
 
@@ -65,11 +56,11 @@ describe('getAllSettings()', () => {
 
   it('parses all stored rows into a typed object', async () => {
     (mockDb.query.appSettings.findMany as jest.Mock).mockResolvedValueOnce([
-      { key: 'search_mode',    value: JSON.stringify('rag') },
       { key: 'active_provider', value: JSON.stringify('gemini') },
+      { key: 'active_model',    value: JSON.stringify('gemini-2.0-flash') },
     ]);
     const settings = await getAllSettings();
-    expect(settings.search_mode).toBe('rag');
     expect(settings.active_provider).toBe('gemini');
+    expect(settings.active_model).toBe('gemini-2.0-flash');
   });
 });

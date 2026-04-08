@@ -55,19 +55,6 @@ export const documents = sqliteTable(
   ]
 );
 
-// ─── Embedding Metadata ──────────────────────────────────────────────────────
-// Companion to the sqlite-vec virtual table (embeddings)
-// The vec0 virtual table is created via raw SQL in client.ts
-
-export const embeddingMetadata = sqliteTable('embedding_metadata', {
-  rowid:      integer('rowid').primaryKey(),  // matches vec0 table rowid
-  fhirId:     text('fhir_id').notNull(),      // FK → fhirResources.id
-  chunkIndex: integer('chunk_index').notNull().default(0),
-  chunkText:  text('chunk_text').notNull(),
-  model:      text('model').notNull(),        // e.g., 'text-embedding-3-small'
-  createdAt:  integer('created_at').notNull(),
-});
-
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export const chatSessions = sqliteTable('chat_sessions', {
@@ -75,7 +62,7 @@ export const chatSessions = sqliteTable('chat_sessions', {
   title:      text('title'),
   provider:   text('provider').notNull(), // 'openai' | 'anthropic' | 'gemini'
   model:      text('model').notNull(),
-  searchMode: text('search_mode').notNull(), // 'rag' | 'fts'
+  searchMode: text('search_mode'), // retained for schema compatibility — no longer used
   createdAt:  integer('created_at').notNull(),
   updatedAt:  integer('updated_at').notNull(),
 });
@@ -133,8 +120,8 @@ export const auditLog = sqliteTable(
 
 // ─── App Settings ─────────────────────────────────────────────────────────────
 // Key/value store for user preferences (all values JSON-encoded)
-// Keys: 'search_mode', 'active_provider', 'active_model', 'embedding_model',
-//       'has_completed_onboarding', 'auto_lock_seconds', 'embedding_dimensions'
+// Keys: 'active_provider', 'active_model', 'has_completed_onboarding',
+//       'auto_lock_seconds', 'custom_base_url', 'has_migrated_api_key'
 
 export const appSettings = sqliteTable('app_settings', {
   key:   text('key').primaryKey(),
@@ -147,7 +134,6 @@ export type FhirResource       = typeof fhirResources.$inferSelect;
 export type NewFhirResource    = typeof fhirResources.$inferInsert;
 export type Document           = typeof documents.$inferSelect;
 export type NewDocument        = typeof documents.$inferInsert;
-export type EmbeddingMetadata  = typeof embeddingMetadata.$inferSelect;
 export type ChatSession        = typeof chatSessions.$inferSelect;
 export type NewChatSession     = typeof chatSessions.$inferInsert;
 export type ChatMessage        = typeof chatMessages.$inferSelect;

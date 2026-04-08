@@ -115,32 +115,6 @@ export async function openDatabase() {
     );
   `);
 
-  // ── FTS5 virtual table (references fhir_resources — must come after it) ──────
-
-  await _sqlite.execAsync(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS fhir_resources_fts USING fts5(
-      resource_id,
-      resource_type,
-      text_content,
-      content='fhir_resources',
-      content_rowid='rowid',
-      tokenize='porter unicode61'
-    );
-  `);
-
-  // ── Embedding metadata (companion to sqlite-vec vec0 virtual table) ──────────
-
-  await _sqlite.execAsync(`
-    CREATE TABLE IF NOT EXISTS embedding_metadata (
-      rowid       INTEGER PRIMARY KEY,
-      fhir_id     TEXT NOT NULL,
-      chunk_index INTEGER NOT NULL DEFAULT 0,
-      chunk_text  TEXT NOT NULL,
-      model       TEXT NOT NULL,
-      created_at  INTEGER NOT NULL
-    );
-  `);
-
   _db = drizzle(_sqlite, { schema, logger: false });
 
   // Add content_hash column if it doesn't exist (migration for existing installs)
@@ -171,32 +145,3 @@ export function getSQLite() {
   return _sqlite;
 }
 
-// ─── FTS Indexing Helpers ─────────────────────────────────────────────────────
-
-/**
- * Index a FHIR resource into the FTS5 table.
- * Call this after inserting a new fhir_resource row.
- */
-export async function indexFhirResourceFts(
-  resourceId: string,
-  resourceType: string,
-  textContent: string
-) {
-  const sqlite = getSQLite();
-  await sqlite.runAsync(
-    `INSERT OR REPLACE INTO fhir_resources_fts(resource_id, resource_type, text_content)
-     VALUES (?, ?, ?)`,
-    [resourceId, resourceType, textContent]
-  );
-}
-
-/**
- * Remove a resource from the FTS5 index.
- */
-export async function removeFhirResourceFts(resourceId: string) {
-  const sqlite = getSQLite();
-  await sqlite.runAsync(
-    `DELETE FROM fhir_resources_fts WHERE resource_id = ?`,
-    [resourceId]
-  );
-}

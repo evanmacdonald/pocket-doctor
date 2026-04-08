@@ -1,7 +1,7 @@
 jest.mock('~/db/client', () => require('../../../__mocks__/db-client'));
 
 import { upsertFhirResource, getFhirResourceById, getFhirResourcesByType, softDeleteFhirResource } from '../fhir.repository';
-import { mockDb, resetMockDb, indexFhirResourceFts, removeFhirResourceFts } from '../../../__mocks__/db-client';
+import { mockDb, resetMockDb } from '../../../__mocks__/db-client';
 
 const sampleResource = {
   resourceType: 'Condition',
@@ -36,7 +36,6 @@ describe('upsertFhirResource()', () => {
     const result = await upsertFhirResource(sampleResource);
     expect(result).toEqual(savedRow);
     expect(mockDb.insert).not.toHaveBeenCalled();
-    expect(indexFhirResourceFts).not.toHaveBeenCalled();
   });
 
   it('inserts a new row when no duplicate exists', async () => {
@@ -48,19 +47,6 @@ describe('upsertFhirResource()', () => {
     const result = await upsertFhirResource(sampleResource);
     expect(mockDb.insert).toHaveBeenCalledTimes(1);
     expect(result).toEqual(savedRow);
-  });
-
-  it('calls indexFhirResourceFts after inserting', async () => {
-    (mockDb.query.fhirResources.findFirst as jest.Mock)
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(savedRow);
-
-    await upsertFhirResource(sampleResource);
-    expect(indexFhirResourceFts).toHaveBeenCalledWith(
-      expect.any(String),
-      'Condition',
-      expect.any(String),
-    );
   });
 
   it('throws if the saved row cannot be retrieved after insert', async () => {
@@ -114,10 +100,5 @@ describe('softDeleteFhirResource()', () => {
     expect(mockDb.update).toHaveBeenCalledTimes(1);
     const setArg = (mockDb.update as jest.Mock).mock.results[0].value.set.mock.calls[0][0];
     expect(setArg).toMatchObject({ isDeleted: 1 });
-  });
-
-  it('calls removeFhirResourceFts', async () => {
-    await softDeleteFhirResource('res-1');
-    expect(removeFhirResourceFts).toHaveBeenCalledWith('res-1');
   });
 });

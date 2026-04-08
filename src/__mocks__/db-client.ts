@@ -91,5 +91,3 @@ export const getDatabase  = jest.fn(() => mockDb);
 export const getSQLite    = jest.fn(() => mockSqlite);
 export const openDatabase = jest.fn().mockResolvedValue(mockDb);
 
-export const indexFhirResourceFts  = jest.fn().mockResolvedValue(undefined);
-export const removeFhirResourceFts = jest.fn().mockResolvedValue(undefined);
