@@ -11,7 +11,7 @@ Local-first iOS health record app built with Expo (React Native). All data lives
 - **Language:** TypeScript (strict)
 - **Styling:** NativeWind v4 (Tailwind CSS for React Native)
 - **Database:** expo-sqlite + drizzle-orm (SQLite on-device)
-- **Search:** SQLite FTS5 (keyword), sqlite-vec (RAG embeddings — pre-v1, pinned)
+- **Search:** SQLite FTS5 (keyword), sqlite-vec (RAG embeddings — pre-v1, pinned) — **being removed in PR 1, see Roadmap below**
 - **LLM:** Direct REST fetch to OpenAI / Anthropic / Gemini — no SDKs (incompatible with Hermes)
 - **Secrets:** expo-secure-store (iOS Keychain, WHEN_UNLOCKED_THIS_DEVICE_ONLY)
 - **Encryption:** react-native-quick-crypto + react-native-nitro-modules (AES-256-GCM)
@@ -21,7 +21,7 @@ Local-first iOS health record app built with Expo (React Native). All data lives
 - **No backend.** All logic runs on-device. Never add a server, API route, or cloud sync.
 - **No LLM SDKs.** Use direct `fetch()` REST calls only — SDKs are incompatible with Hermes.
 - **Drizzle schema = source of truth.** Tables are created via `CREATE TABLE IF NOT EXISTS` in `src/db/client.ts` `openDatabase()` — not drizzle-kit migrations.
-- **PDF ingestion uses Gemini inline PDF** — binary PDFs are sent as base64 `inline_data` parts, not text-extracted.
+- **PDF ingestion uses Gemini inline PDF** — binary PDFs are sent as base64 `inline_data` parts, not text-extracted. (Being generalised in PR 2 to support all providers.)
 - **Active provider is auto-detected** via `listModels()` — never hardcode a Gemini model name.
 
 ## Project Structure
@@ -47,8 +47,9 @@ src/
     provider-registry.ts  # Lazy provider instantiation from Keychain
     providers/      # openai, anthropic, gemini — all use fetch()
   rag/
-    rag.service.ts  # sqlite-vec embeddings + ANN search
-    fts.service.ts  # FTS5 keyword search
+    rag.service.ts  # sqlite-vec embeddings + ANN search  (deleted in PR 1)
+    fts.service.ts  # FTS5 keyword search                 (deleted in PR 1)
+    context-builder.ts  # Builds full-record LLM context  (moved to src/llm/ in PR 1)
   backup/
     export.service.ts / import.service.ts / crypto.service.ts
 ```
@@ -82,3 +83,110 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 - **expo-file-system v55:** Import from `expo-file-system/legacy` not `expo-file-system`.
 - **iOS 26 simulator:** Clipboard paste is broken — type API keys manually or use an iOS 18 simulator.
 - **Stuck documents:** On startup, `openDatabase()` resets any `pending`/`processing` documents to `failed`.
+
+---
+
+## Roadmap
+
+Four independent PRs, each targeting branch `claude/refactor-llm-processing-Fy8w7` (or a fresh branch per PR). Implement in order — PR 1 first, then PR 2, then PR 3 and PR 4 can be done in parallel.
+
+### PR 1 — Remove RAG / vector search
+**Branch:** create `feat/remove-rag` from main
+**Goal:** Delete all vector-search and FTS infrastructure. The chat already loads every FHIR record as full context via `buildFullContext()` — RAG was never wired into the live app. `fts.service.ts` is already dead code (nothing imports it).
+
+**Changes:**
+- Delete `src/rag/rag.service.ts` and its test file
+- Delete `src/rag/fts.service.ts` and its test file
+- Move `src/rag/context-builder.ts` → `src/llm/context-builder.ts`; update the import in `src/llm/chat.service.ts`
+- Delete the `rag/` directory once empty
+- `src/db/schema.ts`: remove the `embeddingMetadata` table definition and its exported types
+- `src/db/client.ts`: remove the `CREATE TABLE embedding_metadata` block; remove the `CREATE VIRTUAL TABLE fhir_resources_fts` block; remove `indexFhirResourceFts()` and `removeFhirResourceFts()` helpers
+- `src/db/repositories/fhir.repository.ts`: remove the `indexFhirResourceFts` call in `upsertFhirResource` and the `removeFhirResourceFts` call in `softDeleteFhirResource`
+- `src/ingestion/pipeline.ts`: remove the `embedFhirResource` import and the `search_mode` guard block that calls it
+- `src/llm/types.ts`: remove `PROVIDERS_WITH_EMBEDDING_SUPPORT`, `DEFAULT_EMBEDDING_MODELS`, `EMBEDDING_DIMENSIONS`
+- `app/(tabs)/settings/index.tsx`: remove the "Search Mode" `SettingsRow` and the `searchMode` state; remove the `getSetting('search_mode')` call
+- `src/db/repositories/settings.repository.ts`: remove any `search_mode` / `embedding_model` default handling
+- Leave the `search_mode` column in the `chat_sessions` DB table (existing installs have it) — just stop reading/writing it in the app
+- Update any tests that referenced the deleted modules
+
+**Definition of done:** `tsc --noEmit` passes; no imports reference `rag/` or `embedding`; Settings screen has no Search Mode row.
+
+---
+
+### PR 2 — Universal file-based LLM document processing + separate ingestion provider setting
+**Branch:** create `feat/universal-ingestion` from main (after PR 1 merges)
+**Goal:** Send documents directly to the LLM as inline file data for all providers, rather than running a brittle regex PDF text extractor. Add a separate provider/model setting for ingestion vs. chat so users can e.g. use Gemini for document processing and Claude for chat.
+
+**Separate ingestion provider (settings):**
+- New settings keys: `ingestion_provider` and `ingestion_model` (stored in `app_settings` alongside existing `active_provider` / `active_model`)
+- `app/(tabs)/settings/index.tsx`: add a "Document Processing" row under "AI & Chat" showing `ingestion_provider` · `ingestion_model`. Both "Chat AI" and "Document Processing" rows navigate to the API keys / model picker screen, passing a `role` param (`chat` vs `ingestion`) to determine which settings keys are written
+- `src/ingestion/normalizers/fhir.normalizer.ts`: update `resolveProvider()` to read `ingestion_provider` / `ingestion_model`. Fallback chain: if `ingestion_provider` has no configured key, fall back to `active_provider`
+- Default for `ingestion_provider` on first launch: auto-select the best available provider (Gemini if key exists, else Anthropic, else OpenAI)
+
+**Universal file attachment:**
+- `src/llm/types.ts`: add `fileAttachment?: { base64: string; mimeType: string }` to `ChatCompletionRequest`. Remove the `_pdfBase64` one-off hack.
+- Update providers to handle `fileAttachment` in their `complete()` method:
+  - **Gemini** (`gemini.provider.ts`): replace `_pdfBase64` with `fileAttachment`; pass as `inline_data` for any `mimeType` (PDF or image)
+  - **Anthropic** (`anthropic.provider.ts`): add document/image part to the user message — `type: "document"` for `application/pdf`, `type: "image"` for image types
+  - **OpenAI** (`openai.provider.ts`): add `image_url` (base64 data URL) for image types; for `application/pdf` fall back to text extraction with a clear error if text extraction yields nothing ("Use Gemini or Anthropic for scanned PDFs")
+  - **Custom** (`custom.provider.ts`): ignore `fileAttachment` silently (custom endpoints vary)
+- `src/ingestion/normalizers/fhir.normalizer.ts`:
+  - Merge `normalizeTextToFhir` + `normalizePdfToFhir` into a single `normalizeDocumentToFhir(opts: { filePath?: string; mimeType?: string; rawText?: string })` function
+  - If `filePath` is present: read as base64, call `provider.complete()` with `fileAttachment`
+  - If only `rawText`: call `provider.complete()` with text content as before
+- `src/ingestion/pipeline.ts`:
+  - Replace the multi-branch text-extraction logic in `_processDocument()` with: if `filePath` present → call `normalizeDocumentToFhir({ filePath, mimeType })`; if `rawText` present → call `normalizeDocumentToFhir({ rawText })`
+  - Remove `_extractText()` entirely
+
+**Definition of done:** `tsc --noEmit` passes; uploading a scanned PDF works with Gemini and Anthropic; uploading a JPEG works with all three providers; Settings shows separate Chat AI and Document Processing rows.
+
+---
+
+### PR 3 — Manual FHIR record entry (structured form)
+**Branch:** create `feat/manual-record-entry` from main (after PR 2 merges)
+**Goal:** Let users add health records without uploading a document, using a type-specific form.
+
+**Entry point:**
+- `app/(tabs)/index.tsx`: change the `+` header button to open a bottom sheet (or `ActionSheetIOS`) with three options: "Upload Document" (existing), "Describe in Words" (PR 4), "Fill out Form" (this PR). For now the "Describe in Words" option can be a stub that navigates to a not-yet-implemented screen.
+
+**New screen `app/records/new.tsx`:**
+- Step 1: card grid to pick a resource type — Condition, Medication, Allergy, Immunization, Observation, Procedure, Diagnostic Report
+- Step 2: type-specific form fields:
+  - **Condition**: Name (text), Date, Status picker (active / resolved / inactive), Notes
+  - **MedicationStatement**: Drug name, Dose, Frequency, Start date, Status (active / stopped)
+  - **AllergyIntolerance**: Allergen, Reaction description, Severity picker (mild / moderate / severe), Date
+  - **Immunization**: Vaccine name, Date
+  - **Observation**: Test/lab name, Value, Unit, Date
+  - **Procedure**: Name, Date, Notes
+  - **DiagnosticReport**: Title, Date, Conclusion/summary
+- On "Save": serialise form data to a valid FHIR R4 JSON object, call `upsertFhirResource({ resourceType, resourceJson, sourceDocumentId: null, effectiveDate })`
+- Navigate back to Records screen on success; show inline validation errors on failure
+
+**Edit support:**
+- `app/records/[id].tsx`: if `resource.sourceDocumentId === null`, show an "Edit" button that navigates to `app/records/edit/[id].tsx` (or passes an `edit` param to `new.tsx`)
+- Records from documents do not get an Edit button — they are LLM-generated and editing would drift from the source
+
+**Definition of done:** `tsc --noEmit` passes; a Condition, Medication, and Allergy can each be created and edited manually without an API key; records appear in the grouped list immediately after save.
+
+---
+
+### PR 4 — Plain English → FHIR via LLM
+**Branch:** create `feat/natural-language-entry` from main (after PR 2 merges; parallel with PR 3)
+**Goal:** Let users describe a health record in plain English and have the LLM extract the correct FHIR resource(s), with a review step before saving.
+
+**New screen `app/records/describe.tsx`:**
+- Full-screen text area with placeholder: *"e.g. I was diagnosed with Type 2 diabetes in March 2019 and started metformin 500mg twice daily"*
+- "Extract Records" button → calls `normalizeDocumentToFhir({ rawText })` using the `ingestion_provider` (from PR 2) — same normalizer, no new LLM logic needed
+- Loading state while the LLM processes
+
+**Review step (same screen, step 2):**
+- List of extracted FHIR resources rendered as `ResourceCard` components (same component used in the main records list)
+- Each card has an `×` to remove it before confirming
+- "Save N records" button → loops through confirmed resources, calls `upsertFhirResource()` for each with `sourceDocumentId: null`
+- "Start over" link to go back to step 1
+
+**Entry point:**
+- Wire up the "Describe in Words" stub from PR 3's bottom sheet to navigate to this screen
+- If PR 3 has not shipped yet, add a temporary standalone entry point (e.g. a long-press on the `+` button)
+
+**Definition of done:** `tsc --noEmit` passes; typing "penicillin allergy" extracts an `AllergyIntolerance` resource that appears in the records list after confirmation; multi-resource input ("diabetes and metformin") extracts both a `Condition` and a `MedicationStatement`.
