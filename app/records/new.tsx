@@ -179,7 +179,7 @@ function fromFhir(resource: FhirResource): { type: ResourceTypeId; form: FormSta
     const r = JSON.parse(resource.resourceJson);
     switch (type) {
       case 'Condition':
-        form.conditionName   = r.code?.text ?? '';
+        form.conditionName   = r.code?.text ?? r.code?.coding?.[0]?.display ?? '';
         form.conditionStatus = r.clinicalStatus?.coding?.[0]?.code ?? 'active';
         form.conditionDate   = r.recordedDate ?? resource.effectiveDate ?? '';
         form.conditionNotes  = r.note?.[0]?.text ?? '';
@@ -187,7 +187,7 @@ function fromFhir(resource: FhirResource): { type: ResourceTypeId; form: FormSta
       case 'MedicationStatement': {
         const dosage = r.dosage?.[0]?.text ?? '';
         const parts  = dosage.split(' ');
-        form.medDrug      = r.medicationCodeableConcept?.text ?? '';
+        form.medDrug      = r.medicationCodeableConcept?.text ?? r.medicationCodeableConcept?.coding?.[0]?.display ?? '';
         form.medStatus    = r.status ?? 'active';
         form.medDose      = parts[0] ?? '';
         form.medFrequency = parts.slice(1).join(' ');
@@ -195,28 +195,28 @@ function fromFhir(resource: FhirResource): { type: ResourceTypeId; form: FormSta
         break;
       }
       case 'AllergyIntolerance':
-        form.allergen        = r.code?.text ?? '';
+        form.allergen        = r.code?.text ?? r.code?.coding?.[0]?.display ?? '';
         form.allergyReaction = r.reaction?.[0]?.description ?? '';
         form.allergySeverity = r.reaction?.[0]?.severity ?? 'mild';
         form.allergyDate     = r.recordedDate ?? resource.effectiveDate ?? '';
         break;
       case 'Immunization':
-        form.vaccineName = r.vaccineCode?.text ?? '';
+        form.vaccineName = r.vaccineCode?.text ?? r.vaccineCode?.coding?.[0]?.display ?? '';
         form.vaccineDate = r.occurrenceDateTime ?? resource.effectiveDate ?? '';
         break;
       case 'Observation':
-        form.obsTestName = r.code?.text ?? '';
+        form.obsTestName = r.code?.text ?? r.code?.coding?.[0]?.display ?? '';
         form.obsValue    = r.valueQuantity?.value?.toString() ?? '';
         form.obsUnit     = r.valueQuantity?.unit ?? '';
         form.obsDate     = r.effectiveDateTime ?? resource.effectiveDate ?? '';
         break;
       case 'Procedure':
-        form.procName  = r.code?.text ?? '';
+        form.procName  = r.code?.text ?? r.code?.coding?.[0]?.display ?? '';
         form.procDate  = r.performedDateTime ?? resource.effectiveDate ?? '';
         form.procNotes = r.note?.[0]?.text ?? '';
         break;
       case 'DiagnosticReport':
-        form.reportTitle      = r.code?.text ?? '';
+        form.reportTitle      = r.code?.text ?? r.code?.coding?.[0]?.display ?? '';
         form.reportDate       = r.effectiveDateTime ?? resource.effectiveDate ?? '';
         form.reportConclusion = r.conclusion ?? '';
         break;

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { getFhirResourceById, softDeleteFhirResource } from '~/db/repositories/fhir.repository';
@@ -122,16 +122,16 @@ export default function RecordDetailScreen() {
   const [record, setRecord] = useState<FhirResource | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!id) return;
     getFhirResourceById(id).then((r) => {
       setRecord(r ?? null);
       setLoading(false);
       logEvent({ eventType: 'record_viewed', resourceType: r?.resourceType, resourceId: id });
     });
-  }, [id]);
+  }, [id]));
 
-  const canEdit = record?.sourceDocumentId === null;
+  const canEdit = record != null;
 
   const handleEdit = () => {
     if (!id) return;
