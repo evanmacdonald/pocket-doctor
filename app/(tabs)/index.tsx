@@ -4,7 +4,7 @@ import {
   ActionSheetIOS, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -214,9 +214,9 @@ export default function RecordsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
+  useEffect(() => {
     const unsub = ingestionQueue.onPendingCountChange((count) => {
       setQueueCount(count);
       if (count === 0) {
