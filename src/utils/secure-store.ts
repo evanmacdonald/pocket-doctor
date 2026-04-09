@@ -7,8 +7,9 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESSIBILITY = SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY;
 
 export const SecureKeys = {
-  ACTIVE_API_KEY:   'apikey_active',                 // Single active provider key
-  PORTAL_TOKEN_KEY: 'portal_token_encryption_key',   // AES key for portal tokens
+  ACTIVE_API_KEY:    'apikey_active',                 // Chat provider key
+  INGESTION_API_KEY: 'apikey_ingestion',              // Document-processing provider key
+  PORTAL_TOKEN_KEY:  'portal_token_encryption_key',   // AES key for portal tokens
   // Migration-only — read and delete on first launch, never written after migration
   _LEGACY_OPENAI_KEY:    'apikey_openai',
   _LEGACY_ANTHROPIC_KEY: 'apikey_anthropic',

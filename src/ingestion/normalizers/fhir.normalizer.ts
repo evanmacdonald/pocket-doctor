@@ -56,13 +56,14 @@ async function resolveProvider(): Promise<{
   providerName: LLMProviderName;
   model: string;
 }> {
-  // Try ingestion_provider first; fall back to active_provider if no key is configured
+  // Try the dedicated ingestion key first; fall back to the chat key if no
+  // ingestion key is configured.
   let providerName = await getSetting('ingestion_provider') as LLMProviderName;
-  let provider     = await providerRegistry.getProvider(providerName);
+  let provider     = await providerRegistry.getIngestionProvider();
 
   if (!provider) {
     providerName = await getSetting('active_provider') as LLMProviderName;
-    provider     = await providerRegistry.getProvider(providerName);
+    provider     = await providerRegistry.getActiveProvider();
   }
 
   if (!provider) {
@@ -99,7 +100,10 @@ function _parseResponse(response: string): ParsedFhirBundle {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error(`LLM returned invalid JSON: ${cleaned.slice(0, 200)}`);
+    throw new Error(
+      `LLM returned invalid JSON (length=${cleaned.length}, ends with: ${JSON.stringify(cleaned.slice(-80))}). ` +
+      `Likely truncated by maxTokens. First 200 chars: ${cleaned.slice(0, 200)}`
+    );
   }
 
   const result = FhirBundleSchema.safeParse(parsed);
@@ -145,7 +149,7 @@ export async function normalizeDocumentToFhir(opts: {
         { role: 'user',   content: 'Extract all health records from this document.' },
       ],
       model,
-      maxTokens:      4096,
+      maxTokens:      8192,
       temperature:    0,
       fileAttachment: { base64, mimeType: opts.mimeType },
     });

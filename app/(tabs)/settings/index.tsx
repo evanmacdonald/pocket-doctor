@@ -65,17 +65,18 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       async function loadSettings() {
-        const [key, provider, model, ingestProvider, ingestModel] = await Promise.all([
+        const [chatKey, ingestKey, provider, model, ingestProvider, ingestModel] = await Promise.all([
           getSecureItem(SecureKeys.ACTIVE_API_KEY),
+          getSecureItem(SecureKeys.INGESTION_API_KEY),
           getSetting('active_provider') as Promise<LLMProviderName>,
           getSetting('active_model'),
           getSetting('ingestion_provider') as Promise<LLMProviderName>,
           getSetting('ingestion_model'),
         ]);
-        setActiveProvider(key ? provider : null);
-        setActiveModel(key ? model : '');
-        setIngestionProvider(key ? ingestProvider : null);
-        setIngestionModel(key ? ingestModel : '');
+        setActiveProvider(chatKey ? provider : null);
+        setActiveModel(chatKey ? model : '');
+        setIngestionProvider(ingestKey ? ingestProvider : null);
+        setIngestionModel(ingestKey ? ingestModel : '');
       }
       loadSettings();
     }, [])

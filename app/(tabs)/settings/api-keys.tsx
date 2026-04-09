@@ -65,6 +65,9 @@ type ConfigStep = 'view' | 'select' | 'key-input' | 'model-pick';
 export default function ApiKeysScreen() {
   const { role } = useLocalSearchParams<{ role?: string }>();
   const isIngestion = role === 'ingestion';
+  const keyName     = isIngestion ? SecureKeys.INGESTION_API_KEY : SecureKeys.ACTIVE_API_KEY;
+  const providerKey = isIngestion ? 'ingestion_provider' as const : 'active_provider' as const;
+  const modelKey    = isIngestion ? 'ingestion_model'    as const : 'active_model'    as const;
 
   const [step,              setStep]              = useState<ConfigStep>('select');
   const [loading,           setLoading]           = useState(true);
@@ -96,10 +99,8 @@ export default function ApiKeysScreen() {
   async function loadCurrentConfig() {
     setLoading(true);
     try {
-      const key = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+      const key = await getSecureItem(keyName);
       if (key) {
-        const providerKey = isIngestion ? 'ingestion_provider' : 'active_provider';
-        const modelKey    = isIngestion ? 'ingestion_model'    : 'active_model';
         const [provider, model] = await Promise.all([
           getSetting(providerKey) as Promise<LLMProviderName>,
           getSetting(modelKey),
@@ -172,7 +173,7 @@ export default function ApiKeysScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            await deleteSecureItem(SecureKeys.ACTIVE_API_KEY);
+            await deleteSecureItem(keyName);
             if (activeProvider === 'custom') {
               await setSetting('custom_base_url', '');
             }
@@ -293,22 +294,16 @@ export default function ApiKeysScreen() {
         }
       }
 
-      if (isIngestion) {
-        // Document processing: store provider + model only; key is shared
-        await setSetting('ingestion_provider', selectedProvider);
-        await setSetting('ingestion_model', modelToSave);
-      } else {
-        await setSecureItem(SecureKeys.ACTIVE_API_KEY, apiKeyInput.trim());
-        await setSetting('active_provider', selectedProvider);
-        await setSetting('active_model', modelToSave);
+      await setSecureItem(keyName, apiKeyInput.trim());
+      await setSetting(providerKey, selectedProvider);
+      await setSetting(modelKey, modelToSave);
 
-        if (selectedProvider === 'custom') {
-          await setSetting('custom_base_url', baseUrlInput.trim());
-        }
-
-        providerRegistry.invalidate();
-        clearModelCache();
+      if (selectedProvider === 'custom') {
+        await setSetting('custom_base_url', baseUrlInput.trim());
       }
+
+      providerRegistry.invalidate();
+      clearModelCache();
 
       await logEvent({ eventType: 'api_key_set', metadata: { provider: selectedProvider, role: role ?? 'chat' } });
 
