@@ -14,6 +14,8 @@ import type { LLMProvider, LLMProviderName } from './types';
 class ProviderRegistry {
   private _cached: LLMProvider | null = null;
   private _cachedProviderName: LLMProviderName | null = null;
+  private _cachedIngestion: LLMProvider | null = null;
+  private _cachedIngestionName: LLMProviderName | null = null;
 
   /**
    * Get a provider by name.
@@ -67,10 +69,31 @@ class ProviderRegistry {
     return [name];
   }
 
+  /**
+   * Get the ingestion provider, backed by INGESTION_API_KEY and the
+   * `ingestion_provider` setting. Returns null if no ingestion key is set.
+   */
+  async getIngestionProvider(): Promise<LLMProvider | null> {
+    const apiKey = await getSecureItem(SecureKeys.INGESTION_API_KEY);
+    if (!apiKey) return null;
+
+    const name = await getSetting('ingestion_provider') as LLMProviderName;
+    if (this._cachedIngestion && this._cachedIngestionName === name) {
+      return this._cachedIngestion;
+    }
+
+    const provider = await this._createProvider(name, apiKey);
+    this._cachedIngestion = provider;
+    this._cachedIngestionName = name;
+    return provider;
+  }
+
   /** Clear the provider cache (call after storing/removing an API key) */
   invalidate(_name?: LLMProviderName) {
     this._cached = null;
     this._cachedProviderName = null;
+    this._cachedIngestion = null;
+    this._cachedIngestionName = null;
   }
 
   private async _createProvider(name: LLMProviderName, apiKey: string): Promise<LLMProvider> {

@@ -13,7 +13,7 @@ import {
 /**
  * Custom OpenAI-compatible provider.
  * Supports any server that implements the OpenAI REST API (Ollama, LM Studio, etc.).
- * Does not support embeddings — use OpenAI or Gemini for RAG/Smart Search.
+ * Does not support embeddings. fileAttachment is silently ignored — custom endpoints vary.
  */
 export class CustomProvider implements LLMProvider {
   readonly name: LLMProviderName = 'custom';

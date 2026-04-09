@@ -9,12 +9,18 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface FileAttachment {
+  base64: string;
+  mimeType: string;
+}
+
 export interface ChatCompletionRequest {
   messages: ChatMessage[];
   model: string;
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
+  fileAttachment?: FileAttachment;
 }
 
 export interface ChatCompletionChunk {

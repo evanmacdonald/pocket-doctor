@@ -2,6 +2,7 @@ jest.mock('~/utils/secure-store', () => ({
   getSecureItem: jest.fn(),
   SecureKeys: {
     ACTIVE_API_KEY:        'apikey_active',
+    INGESTION_API_KEY:     'apikey_ingestion',
     PORTAL_TOKEN_KEY:      'portal_token_encryption_key',
     _LEGACY_OPENAI_KEY:    'apikey_openai',
     _LEGACY_ANTHROPIC_KEY: 'apikey_anthropic',

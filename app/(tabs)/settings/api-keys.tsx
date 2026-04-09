@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TextInput, Pressable, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import {
   getSecureItem, setSecureItem, deleteSecureItem, SecureKeys,
 } from '~/utils/secure-store';
@@ -63,6 +63,12 @@ type ConfigStep = 'view' | 'select' | 'key-input' | 'model-pick';
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ApiKeysScreen() {
+  const { role } = useLocalSearchParams<{ role?: string }>();
+  const isIngestion = role === 'ingestion';
+  const keyName     = isIngestion ? SecureKeys.INGESTION_API_KEY : SecureKeys.ACTIVE_API_KEY;
+  const providerKey = isIngestion ? 'ingestion_provider' as const : 'active_provider' as const;
+  const modelKey    = isIngestion ? 'ingestion_model'    as const : 'active_model'    as const;
+
   const [step,              setStep]              = useState<ConfigStep>('select');
   const [loading,           setLoading]           = useState(true);
 
@@ -93,11 +99,11 @@ export default function ApiKeysScreen() {
   async function loadCurrentConfig() {
     setLoading(true);
     try {
-      const key = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
+      const key = await getSecureItem(keyName);
       if (key) {
         const [provider, model] = await Promise.all([
-          getSetting('active_provider') as Promise<LLMProviderName>,
-          getSetting('active_model'),
+          getSetting(providerKey) as Promise<LLMProviderName>,
+          getSetting(modelKey),
         ]);
         setActiveProvider(provider);
         setActiveModel(model);
@@ -167,7 +173,7 @@ export default function ApiKeysScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            await deleteSecureItem(SecureKeys.ACTIVE_API_KEY);
+            await deleteSecureItem(keyName);
             if (activeProvider === 'custom') {
               await setSetting('custom_base_url', '');
             }
@@ -288,9 +294,9 @@ export default function ApiKeysScreen() {
         }
       }
 
-      await setSecureItem(SecureKeys.ACTIVE_API_KEY, apiKeyInput.trim());
-      await setSetting('active_provider', selectedProvider);
-      await setSetting('active_model', modelToSave);
+      await setSecureItem(keyName, apiKeyInput.trim());
+      await setSetting(providerKey, selectedProvider);
+      await setSetting(modelKey, modelToSave);
 
       if (selectedProvider === 'custom') {
         await setSetting('custom_base_url', baseUrlInput.trim());
@@ -299,7 +305,7 @@ export default function ApiKeysScreen() {
       providerRegistry.invalidate();
       clearModelCache();
 
-      await logEvent({ eventType: 'api_key_set', metadata: { provider: selectedProvider } });
+      await logEvent({ eventType: 'api_key_set', metadata: { provider: selectedProvider, role: role ?? 'chat' } });
 
       setActiveProvider(selectedProvider);
       setActiveModel(modelToSave);
@@ -316,10 +322,12 @@ export default function ApiKeysScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  const screenTitle = isIngestion ? 'Document Processing' : 'Chat AI';
+
   if (loading) {
     return (
       <>
-        <Stack.Screen options={{ title: 'AI Provider' }} />
+        <Stack.Screen options={{ title: screenTitle }} />
         <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-950 items-center justify-center" edges={['bottom']}>
           <ActivityIndicator size="large" />
         </SafeAreaView>
@@ -329,7 +337,7 @@ export default function ApiKeysScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'AI Provider' }} />
+      <Stack.Screen options={{ title: screenTitle }} />
       <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-950" edges={['bottom']}>
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
 

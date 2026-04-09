@@ -9,17 +9,21 @@ export type ProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
 export interface AppSettingsMap {
   active_provider:           ProviderName;
   active_model:              string;
+  ingestion_provider:        ProviderName;
+  ingestion_model:           string;
   has_completed_onboarding:  boolean;
   auto_lock_seconds:         number;
-  custom_base_url:           string;    // base URL for custom OpenAI-compatible provider
-  has_migrated_api_key:      boolean;   // one-time migration guard from legacy per-provider keys
+  custom_base_url:           string;
+  has_migrated_api_key:      boolean;
 }
 
 const DEFAULTS: AppSettingsMap = {
   active_provider:          'openai',
   active_model:             'gpt-4o-mini',
+  ingestion_provider:       'openai',  // overridden at runtime by auto-detection
+  ingestion_model:          'gpt-4o-mini',
   has_completed_onboarding: false,
-  auto_lock_seconds:        300, // 5 minutes
+  auto_lock_seconds:        300,
   custom_base_url:          '',
   has_migrated_api_key:     false,
 };

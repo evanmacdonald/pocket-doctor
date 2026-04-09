@@ -17,9 +17,10 @@ export class OpenAIProvider implements LLMProvider {
   constructor(private readonly apiKey: string) {}
 
   async complete(req: ChatCompletionRequest): Promise<string> {
+    const messages = this._prepareMessages(req);
     const res = await this._fetch('/chat/completions', {
       model:       req.model,
-      messages:    req.messages,
+      messages,
       max_tokens:  req.maxTokens ?? 4096,
       temperature: req.temperature ?? 0,
       stream:      false,
@@ -28,12 +29,13 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
+    const messages = this._prepareMessages(req);
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: this._headers(),
       body: JSON.stringify({
         model:       req.model,
-        messages:    req.messages,
+        messages,
         max_tokens:  req.maxTokens ?? 4096,
         temperature: req.temperature ?? 0,
         stream:      true,
@@ -116,6 +118,31 @@ export class OpenAIProvider implements LLMProvider {
       'Content-Type':  'application/json',
       Authorization:   `Bearer ${this.apiKey}`,
     };
+  }
+
+  /**
+   * Build the messages array for the OpenAI API.
+   * If fileAttachment is an image, add it as a vision image_url block on the
+   * last user message. PDFs are not natively supported in chat completions —
+   * the normalizer handles those via text extraction before reaching here.
+   */
+  private _prepareMessages(req: ChatCompletionRequest) {
+    const { messages, fileAttachment } = req;
+    return messages.map((m, idx) => {
+      const isLastUser = m.role === 'user' && idx === messages.length - 1;
+      if (fileAttachment && isLastUser && fileAttachment.mimeType.startsWith('image/')) {
+        return {
+          role:    'user' as const,
+          content: [
+            {
+              type:      'image_url',
+              image_url: { url: `data:${fileAttachment.mimeType};base64,${fileAttachment.base64}` },
+            },
+          ],
+        };
+      }
+      return { role: m.role, content: m.content };
+    });
   }
 
   private async _fetch(path: string, body?: object) {

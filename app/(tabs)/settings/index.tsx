@@ -57,19 +57,26 @@ const PROVIDER_LABEL: Record<LLMProviderName, string> = {
 };
 
 export default function SettingsScreen() {
-  const [activeProvider, setActiveProvider] = useState<LLMProviderName | null>(null);
-  const [activeModel,    setActiveModel]    = useState<string>('');
+  const [activeProvider,    setActiveProvider]    = useState<LLMProviderName | null>(null);
+  const [activeModel,       setActiveModel]       = useState<string>('');
+  const [ingestionProvider, setIngestionProvider] = useState<LLMProviderName | null>(null);
+  const [ingestionModel,    setIngestionModel]    = useState<string>('');
 
   useFocusEffect(
     useCallback(() => {
       async function loadSettings() {
-        const [key, provider, model] = await Promise.all([
+        const [chatKey, ingestKey, provider, model, ingestProvider, ingestModel] = await Promise.all([
           getSecureItem(SecureKeys.ACTIVE_API_KEY),
+          getSecureItem(SecureKeys.INGESTION_API_KEY),
           getSetting('active_provider') as Promise<LLMProviderName>,
           getSetting('active_model'),
+          getSetting('ingestion_provider') as Promise<LLMProviderName>,
+          getSetting('ingestion_model'),
         ]);
-        setActiveProvider(key ? provider : null);
-        setActiveModel(key ? model : '');
+        setActiveProvider(chatKey ? provider : null);
+        setActiveModel(chatKey ? model : '');
+        setIngestionProvider(ingestKey ? ingestProvider : null);
+        setIngestionModel(ingestKey ? ingestModel : '');
       }
       loadSettings();
     }, [])
@@ -81,6 +88,12 @@ export default function SettingsScreen() {
       ? PROVIDER_LABEL[activeProvider]
       : 'Not configured';
 
+  const ingestionSubtitle = ingestionProvider && ingestionModel
+    ? `${PROVIDER_LABEL[ingestionProvider]} · ${ingestionModel}`
+    : ingestionProvider
+      ? PROVIDER_LABEL[ingestionProvider]
+      : 'Not configured';
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-950" edges={['bottom']}>
       <ScrollView className="flex-1">
@@ -88,9 +101,15 @@ export default function SettingsScreen() {
         <SectionHeader title="AI & Chat" />
         <View className="rounded-xl overflow-hidden mx-4 border border-gray-100 dark:border-gray-800">
           <SettingsRow
-            label="AI Provider"
+            label="Chat AI"
             subtitle={providerSubtitle}
-            onPress={() => router.push('/settings/api-keys')}
+            onPress={() => router.push('/settings/api-keys?role=chat')}
+          />
+          <Divider />
+          <SettingsRow
+            label="Document Processing"
+            subtitle={ingestionSubtitle}
+            onPress={() => router.push('/settings/api-keys?role=ingestion')}
           />
         </View>
 

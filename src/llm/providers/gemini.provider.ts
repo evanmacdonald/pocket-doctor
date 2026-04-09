@@ -16,8 +16,8 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async complete(req: ChatCompletionRequest & { _pdfBase64?: string }): Promise<string> {
-    const { systemInstruction, contents } = this._prepareContents(req.messages, req._pdfBase64);
+  async complete(req: ChatCompletionRequest): Promise<string> {
+    const { systemInstruction, contents } = this._prepareContents(req);
 
     const res = await this._fetch(
       `/models/${req.model}:generateContent`,
@@ -32,7 +32,7 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
-    const { systemInstruction, contents } = this._prepareContents(req.messages);
+    const { systemInstruction, contents } = this._prepareContents(req);
 
     const response = await fetch(
       `${BASE_URL}/models/${req.model}:streamGenerateContent?key=${this.apiKey}&alt=sse`,
@@ -90,7 +90,6 @@ export class GeminiProvider implements LLMProvider {
   async embed(req: EmbeddingRequest): Promise<EmbeddingResponse> {
     const inputs = Array.isArray(req.input) ? req.input : [req.input];
 
-    // Gemini batch embed
     const res = await this._fetch(`/models/${req.model}:batchEmbedContents`, {
       requests: inputs.map((text) => ({
         model:   `models/${req.model}`,
@@ -106,9 +105,7 @@ export class GeminiProvider implements LLMProvider {
 
   async validateKey(apiKey: string): Promise<boolean> {
     try {
-      const res = await fetch(
-        `${BASE_URL}/models?key=${apiKey}`
-      );
+      const res = await fetch(`${BASE_URL}/models?key=${apiKey}`);
       return res.ok;
     } catch {
       return false;
@@ -131,19 +128,27 @@ export class GeminiProvider implements LLMProvider {
   // ─── Private ───────────────────────────────────────────────────────────────
 
   /**
-   * Gemini separates the system instruction from the conversation contents.
-   * When pdfBase64 is provided the user turn gets an inline_data part instead of text.
+   * Build Gemini contents array from the request.
+   * If fileAttachment is present, the last user turn gets an inline_data part
+   * alongside (or instead of) the text content.
    */
-  private _prepareContents(messages: ChatCompletionRequest['messages'], pdfBase64?: string) {
+  private _prepareContents(req: ChatCompletionRequest) {
+    const messages = req.messages;
     const systemMsg = messages.find((m) => m.role === 'system');
     const rest = messages.filter((m) => m.role !== 'system');
 
-    const contents = rest.map((m) => {
-      if (pdfBase64 && m.role === 'user') {
+    const contents = rest.map((m, idx) => {
+      const isLastUser = m.role === 'user' && idx === rest.length - 1;
+      if (req.fileAttachment && isLastUser) {
         return {
           role: 'user',
           parts: [
-            { inline_data: { mime_type: 'application/pdf', data: pdfBase64 } },
+            {
+              inline_data: {
+                mime_type: req.fileAttachment.mimeType,
+                data:      req.fileAttachment.base64,
+              },
+            },
           ],
         };
       }
