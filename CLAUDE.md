@@ -90,6 +90,20 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 
 Bugs to fix in a single cleanup PR. Each item includes the file and the fix.
 
+### 2 — Keyboard covers the chat input field
+**File:** `app/chat/[id].tsx`
+**Problem:** `KeyboardAvoidingView` has a hardcoded `keyboardVerticalOffset={90}`. This value represents the navigation bar height and must match the actual header height on the device. On iPhones with Dynamic Island (and other screen sizes), 90 is wrong — the input field ends up partially hidden behind the keyboard rather than being pushed above it.
+**Fix:** Replace the hardcoded offset with `useHeaderHeight()` from `@react-navigation/elements` (available as a transitive dep of Expo Router):
+```tsx
+import { useHeaderHeight } from '@react-navigation/elements';
+// inside component:
+const headerHeight = useHeaderHeight();
+// on the KAV:
+<KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight}>
+```
+
+---
+
 ### 1 — Ingestion `maxTokens` too low — documents fail with truncated JSON
 **File:** `src/ingestion/normalizers/fhir.normalizer.ts`
 **Problem:** The file-ingestion path passes `maxTokens: 8192` to the LLM. A routine 3-page lab result with ~20 labs can produce 6–8k tokens of FHIR JSON just for the Observation resources, pushing right against the ceiling. When output is truncated, `JSON.parse` throws and the entire document fails to ingest.
