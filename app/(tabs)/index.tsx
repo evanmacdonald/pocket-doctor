@@ -266,7 +266,7 @@ export default function RecordsScreen() {
   }, [loadData]);
 
   const handleAdd = useCallback(() => {
-    const options = ['Cancel', 'Upload Document', 'Fill out Form', 'Describe in Words'] as const;
+    const options = ['Cancel', 'Upload Document', 'Fill out Form', 'Describe in Words'];
     const onSelect = (index: number) => {
       if (index === 1) handleUpload();
       if (index === 2) router.push('/records/new');
