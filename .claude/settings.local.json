@@ -25,7 +25,8 @@
       "Bash(grep -r \"cacheDirectory\\\\|documentDirectory\\\\|EncodingType\\\\|deleteAsync\\\\|shareAsync\" node_modules/expo-file-system/build/*.d.ts)",
       "Bash(grep -rn \"documentDirectory\\\\|cacheDirectory\\\\|EncodingType\" node_modules/expo-file-system/build/*.d.ts)",
       "Bash(node node_modules/@expo/cli/build/bin/cli --version)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(grep -n \"fields\\\\[1\\\\]\\\\|Extracted Records\" app/records/[id].tsx app/\\\\\\(tabs\\\\\\)/index.tsx)"
     ]
   }
 }

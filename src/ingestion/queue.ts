@@ -16,7 +16,7 @@ class IngestionQueue {
   }
 
   get pendingCount() {
-    return this._queue.length;
+    return this._queue.length + (this._running ? 1 : 0);
   }
 
   onPendingCountChange(cb: (count: number) => void) {
@@ -27,7 +27,7 @@ class IngestionQueue {
   }
 
   private _notify() {
-    for (const cb of this._listeners) cb(this._queue.length);
+    for (const cb of this._listeners) cb(this.pendingCount);
   }
 
   private async _drain() {

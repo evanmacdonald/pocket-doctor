@@ -430,7 +430,7 @@ export default function RecordsScreen() {
           {records.length > 0 && (
             <>
               <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 pt-6 pb-2">
-                Extracted Records ({records.length})
+                Records ({records.length})
               </Text>
               {groupEntries.map(([groupLabel, groupRecords]) => (
                 <View key={groupLabel} className="mb-4">

@@ -174,7 +174,7 @@ export default function RecordDetailScreen() {
   }
 
   const fields = parseResourceFields(record);
-  const title = fields[1]?.value ?? record.resourceType; // second field is usually the main name
+  const title = fields.find((f) => f.label !== 'Date')?.value ?? record.resourceType;
 
   return (
     <>
