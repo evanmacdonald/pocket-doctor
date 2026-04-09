@@ -131,6 +131,13 @@ export default function RecordDetailScreen() {
     });
   }, [id]);
 
+  const canEdit = record?.sourceDocumentId === null;
+
+  const handleEdit = () => {
+    if (!id) return;
+    router.push(`/records/new?edit=${id}`);
+  };
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Record',
@@ -181,9 +188,16 @@ export default function RecordDetailScreen() {
             </Pressable>
           ),
           headerRight: () => (
-            <Pressable onPress={handleDelete} className="pr-2 active:opacity-60">
-              <FontAwesome name="trash" size={18} color="#ef4444" />
-            </Pressable>
+            <View className="flex-row items-center gap-4 pr-1">
+              {canEdit && (
+                <Pressable onPress={handleEdit} className="active:opacity-60">
+                  <FontAwesome name="pencil" size={18} color="#2563eb" />
+                </Pressable>
+              )}
+              <Pressable onPress={handleDelete} className="active:opacity-60">
+                <FontAwesome name="trash" size={18} color="#ef4444" />
+              </Pressable>
+            </View>
           ),
         }}
       />

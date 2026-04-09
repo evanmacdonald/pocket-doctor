@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, Pressable, ActivityIndicator, Alert, RefreshControl,
+  ActionSheetIOS, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -264,6 +265,29 @@ export default function RecordsScreen() {
     }
   }, [loadData]);
 
+  const handleAdd = useCallback(() => {
+    const options = ['Cancel', 'Upload Document', 'Fill out Form', 'Describe in Words'] as const;
+    const onSelect = (index: number) => {
+      if (index === 1) handleUpload();
+      if (index === 2) router.push('/records/new');
+      if (index === 3) router.push('/records/describe');
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 0 },
+        onSelect,
+      );
+    } else {
+      Alert.alert('Add Record', undefined, [
+        { text: 'Upload Document',   onPress: () => onSelect(1) },
+        { text: 'Fill out Form',     onPress: () => onSelect(2) },
+        { text: 'Describe in Words', onPress: () => onSelect(3) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  }, [handleUpload]);
+
   const handleView = useCallback(async (doc: Document) => {
     if (!doc.filePath) {
       Alert.alert('No file', 'The original file is not available.');
@@ -350,7 +374,7 @@ export default function RecordsScreen() {
           </Text>
         </View>
         <Pressable
-          onPress={handleUpload}
+          onPress={handleAdd}
           disabled={uploading}
           className="w-11 h-11 rounded-full bg-primary-600 items-center justify-center shadow active:opacity-80 disabled:opacity-50"
         >
@@ -383,7 +407,7 @@ export default function RecordsScreen() {
             <View className="mx-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 items-center py-10">
               <Text className="text-4xl mb-3">📁</Text>
               <Text className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">No documents yet</Text>
-              <Text className="text-xs text-gray-400 dark:text-gray-500">Tap + to upload a PDF</Text>
+              <Text className="text-xs text-gray-400 dark:text-gray-500">Tap + to upload a document or add a record</Text>
             </View>
           ) : (
             <View className="mx-4 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800">
