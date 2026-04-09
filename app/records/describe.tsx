@@ -123,7 +123,7 @@ export default function DescribeRecordScreen() {
       const bundle = await normalizeDocumentToFhir({ rawText: trimmed });
       const items: ExtractedItem[] = ((bundle.entry ?? []) as Array<{ resource: RawResource }>)
         .map((e) => e.resource)
-        .filter((r): r is RawResource => typeof r?.resourceType === 'string')
+        .filter((r): r is RawResource => typeof r?.resourceType === 'string' && r.resourceType !== 'Patient')
         .map((r) => ({ resourceType: r.resourceType as string, resource: r }));
 
       if (items.length === 0) {
