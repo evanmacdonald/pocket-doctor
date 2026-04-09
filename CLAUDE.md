@@ -90,44 +90,25 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 
 Bugs to fix in a single cleanup PR. Each item includes the file and the fix.
 
-### 3 — Pressing "Process" on a document resets to idle immediately, appears to do nothing
-**File:** `src/ingestion/queue.ts`
-**Problem:** `_drain()` shifts the job off the queue and calls `_notify()` with `queue.length = 0` before `await job()`. The `RecordsScreen` listener sees `count === 0`, calls `setProcessingId(null)` (clears the spinner) and `loadData()`. Because `loadData`'s DB read was started before `_processDocument` gets to its first `await _setStatus('processing')` write, it reads `ingestionStatus: 'pending'` — so the UI snaps back to showing the "Process" button. Processing is actually running in the background the whole time; the user just has no visible indicator and presses again thinking it didn't start, queuing a duplicate job.
-**Fix:** Make `pendingCount` include the currently-running job (`_running ? 1 : 0`), and have `_notify` report `pendingCount` instead of raw `_queue.length`:
-```ts
-get pendingCount() {
-  return this._queue.length + (this._running ? 1 : 0);
-}
-
-private _notify() {
-  for (const cb of this._listeners) cb(this.pendingCount); // was: this._queue.length
-}
-```
-Count only reaches 0 after the active job finishes, not the moment it's dequeued.
-
----
-
-### 2 — Keyboard covers the chat input field
-**File:** `app/chat/[id].tsx`
-**Problem:** `KeyboardAvoidingView` has a hardcoded `keyboardVerticalOffset={90}`. This value represents the navigation bar height and must match the actual header height on the device. On iPhones with Dynamic Island (and other screen sizes), 90 is wrong — the input field ends up partially hidden behind the keyboard rather than being pushed above it.
-**Fix:** Replace the hardcoded offset with `useHeaderHeight()` from `@react-navigation/elements` (available as a transitive dep of Expo Router):
+### 1 — "Save Configuration" button requires scrolling to reach
+**File:** `app/(tabs)/settings/api-keys.tsx`
+**Problem:** The "Save Configuration" `Pressable` (line ~595) is inside the `ScrollView`, so on shorter devices or when the model list is long, the user must scroll to the bottom to find it.
+**Fix:** Move the button outside the `ScrollView` but inside the `SafeAreaView` so it sticks to the bottom of the screen. The footer note about Keychain storage stays inside the `ScrollView`. Add a top border and background to visually separate it:
 ```tsx
-import { useHeaderHeight } from '@react-navigation/elements';
-// inside component:
-const headerHeight = useHeaderHeight();
-// on the KAV:
-<KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight}>
+      </ScrollView>
+      <View className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
+        <Pressable
+          onPress={handleSave}
+          disabled={saving || (allowManualModel ? !manualModel.trim() : !selectedModel)}
+          className="bg-primary-600 rounded-lg py-3 items-center active:opacity-80 disabled:opacity-40"
+        >
+          {saving
+            ? <ActivityIndicator size="small" color="white" />
+            : <Text className="text-white font-semibold">Save Configuration</Text>}
+        </Pressable>
+      </View>
+    </SafeAreaView>
 ```
-
----
-
-### 1 — Ingestion `maxTokens` too low — documents fail with truncated JSON
-**File:** `src/ingestion/normalizers/fhir.normalizer.ts`
-**Problem:** The file-ingestion path passes `maxTokens: 8192` to the LLM. A routine 3-page lab result with ~20 labs can produce 6–8k tokens of FHIR JSON just for the Observation resources, pushing right against the ceiling. When output is truncated, `JSON.parse` throws and the entire document fails to ingest.
-**Fix:**
-- Raise `maxTokens` to `16384` on the `filePath` branch (line ~152). This immediately helps OpenAI (`gpt-4o-mini` supports 16k output) and gives headroom for Gemini models that support higher limits.
-- Change the Anthropic default ingestion model from `claude-3-5-haiku-latest` to `claude-3-5-sonnet-latest` in `KNOWN_GOOD_MODELS`. Haiku is capped at 8192 output tokens at the model level, so raising `maxTokens` alone won't help Anthropic users — a more capable model is needed.
-- The `rawText` path's `maxTokens: 4096` can stay as-is; the `MAX_INPUT_CHARS = 12000` input cap naturally bounds the output complexity on that path.
 
 ---
 
