@@ -10,7 +10,7 @@ export async function buildFullContext(): Promise<{
   context: string;
   fhirIds: string[];
 }> {
-  const resources = await getAllFhirResources(500);
+  const resources = (await getAllFhirResources(500)).filter((r) => r.resourceType !== 'Patient');
 
   if (resources.length === 0) {
     return {
