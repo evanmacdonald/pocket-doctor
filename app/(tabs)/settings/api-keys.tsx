@@ -500,14 +500,16 @@ export default function ApiKeysScreen() {
           {/* ── Model pick ── */}
           {step === 'model-pick' && selectedProvider && (
             <View className="px-4 pt-5">
-              <Pressable
-                onPress={() => editingModel ? setStep('view') : setStep('key-input')}
-                className="mb-4"
-              >
-                <Text className="text-primary-600 dark:text-primary-400 text-sm">
-                  {editingModel ? '← Cancel' : '← Key'}
-                </Text>
-              </Pressable>
+              {!editingModel && (
+                <Pressable
+                  onPress={() => setStep('key-input')}
+                  className="mb-4"
+                >
+                  <Text className="text-primary-600 dark:text-primary-400 text-sm">
+                    ← Key
+                  </Text>
+                </Pressable>
+              )}
 
               {/* API key field — shown when editing an existing config */}
               {editingModel && (
