@@ -69,18 +69,33 @@ describe('GeminiProvider', () => {
       expect(assistantTurn).toBeTruthy();
     });
 
-    it('sends inline_data part when _pdfBase64 is provided', async () => {
+    it('sends inline_data part when fileAttachment is provided', async () => {
       fetchMock.mockResolvedValue(makeJsonResponse(GEMINI_RESPONSE));
       await provider.complete({
         model: 'gemini-1.5-flash',
-        messages: [{ role: 'user', content: '__PDF_INLINE__' }],
-        _pdfBase64: 'AAAA',
-      } as any);
+        messages: [{ role: 'user', content: 'Extract health records.' }],
+        fileAttachment: { base64: 'AAAA', mimeType: 'application/pdf' },
+      });
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
       const userTurn = body.contents.find((c: { role: string }) => c.role === 'user');
       expect(userTurn.parts[0].inline_data).toEqual({
         mime_type: 'application/pdf',
         data: 'AAAA',
+      });
+    });
+
+    it('sends inline_data part for image fileAttachment', async () => {
+      fetchMock.mockResolvedValue(makeJsonResponse(GEMINI_RESPONSE));
+      await provider.complete({
+        model: 'gemini-1.5-flash',
+        messages: [{ role: 'user', content: 'Extract health records.' }],
+        fileAttachment: { base64: 'imgdata', mimeType: 'image/jpeg' },
+      });
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      const userTurn = body.contents.find((c: { role: string }) => c.role === 'user');
+      expect(userTurn.parts[0].inline_data).toEqual({
+        mime_type: 'image/jpeg',
+        data: 'imgdata',
       });
     });
 

@@ -19,7 +19,7 @@ export class AnthropicProvider implements LLMProvider {
   constructor(private readonly apiKey: string) {}
 
   async complete(req: ChatCompletionRequest): Promise<string> {
-    const { system, messages } = this._prepareMessages(req.messages);
+    const { system, messages } = this._prepareMessages(req);
     const res = await this._fetch('/messages', {
       model:      req.model,
       messages,
@@ -31,7 +31,7 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async *stream(req: ChatCompletionRequest): AsyncGenerator<ChatCompletionChunk> {
-    const { system, messages } = this._prepareMessages(req.messages);
+    const { system, messages } = this._prepareMessages(req);
 
     const response = await fetch(`${BASE_URL}/messages`, {
       method: 'POST',
@@ -137,14 +137,37 @@ export class AnthropicProvider implements LLMProvider {
 
   /**
    * Anthropic separates system messages from the messages array.
-   * Extract the first system message and pass the rest as the messages array.
+   * If a fileAttachment is present it is added as a document/image block
+   * on the last user message using the Anthropic document API.
    */
-  private _prepareMessages(messages: ChatCompletionRequest['messages']) {
-    const systemMsg = messages.find((m) => m.role === 'system');
-    const rest = messages.filter((m) => m.role !== 'system');
+  private _prepareMessages(req: ChatCompletionRequest) {
+    const systemMsg = req.messages.find((m) => m.role === 'system');
+    const rest = req.messages.filter((m) => m.role !== 'system');
+
+    const messages = rest.map((m, idx) => {
+      const isLastUser = m.role === 'user' && idx === rest.length - 1;
+      if (req.fileAttachment && isLastUser) {
+        const { base64, mimeType } = req.fileAttachment;
+        const fileBlock = mimeType === 'application/pdf'
+          ? {
+              type:   'document' as const,
+              source: { type: 'base64' as const, media_type: mimeType, data: base64 },
+            }
+          : {
+              type:   'image' as const,
+              source: { type: 'base64' as const, media_type: mimeType, data: base64 },
+            };
+        return {
+          role:    'user' as const,
+          content: [fileBlock],
+        };
+      }
+      return { role: m.role as 'user' | 'assistant', content: m.content };
+    });
+
     return {
       system:   systemMsg?.content,
-      messages: rest.map((m) => ({ role: m.role, content: m.content })),
+      messages,
     };
   }
 

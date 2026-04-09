@@ -9,7 +9,7 @@ import { getDatabase } from '~/db/client';
 import { documents } from '~/db/schema';
 import { upsertFhirResource } from '~/db/repositories/fhir.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
-import { normalizeTextToFhir, normalizePdfToFhir } from './normalizers/fhir.normalizer';
+import { normalizeDocumentToFhir } from './normalizers/fhir.normalizer';
 import { ingestionQueue } from './queue';
 import { uuid } from '~/utils/uuid';
 import { eq } from 'drizzle-orm';
@@ -111,35 +111,23 @@ async function _processDocument(
   try {
     await _setStatus(docId, 'processing');
 
-    let rawText = params.rawText ?? '';
-
-    // ── Step 1: Extract text if not already provided ──────────────────────
-    if (!rawText && params.filePath) {
-      rawText = await _extractText(params.filePath, params.mimeType);
-      await db
-        .update(documents)
-        .set({ rawText })
-        .where(eq(documents.id, docId));
-    }
-
-    // ── Step 2: Parse FHIR ────────────────────────────────────────────────
+    // ── Parse FHIR ────────────────────────────────────────────────────────
     let fhirEntries: Array<{ resource: { resourceType: string } & Record<string, unknown> }> = [];
 
     if (params.fhirJson) {
       // Portal-sourced: already native FHIR JSON
       const bundle = JSON.parse(params.fhirJson);
       fhirEntries = bundle.entry ?? [];
-    } else if (rawText.trim().length > 20) {
-      // Text was extracted — normalize via LLM
-      const bundle = await normalizeTextToFhir(rawText);
+    } else if (params.filePath) {
+      // Send the file directly to the LLM as inline base64 data
+      const bundle = await normalizeDocumentToFhir({ filePath: params.filePath, mimeType: params.mimeType });
       fhirEntries = bundle.entry ?? [];
-    } else if (params.filePath && params.mimeType === 'application/pdf') {
-      // Compressed PDF — send bytes directly to the LLM (Gemini supports inline PDFs)
-      const bundle = await normalizePdfToFhir(params.filePath);
+    } else if (params.rawText) {
+      const bundle = await normalizeDocumentToFhir({ rawText: params.rawText });
       fhirEntries = bundle.entry ?? [];
     } else {
       throw new Error(
-        'No readable text found in this document. Try a PDF exported from Word, Pages, or a patient portal.'
+        'No document content provided. Please try uploading the file again.'
       );
     }
 
@@ -150,7 +138,7 @@ async function _processDocument(
       );
     }
 
-    // ── Step 3: Store FHIR resources ──────────────────────────────────────
+    // ── Store FHIR resources ──────────────────────────────────────────────
     for (const entry of fhirEntries) {
       const resource = entry.resource;
       if (!resource?.resourceType) continue;
@@ -179,45 +167,6 @@ async function _processDocument(
       .where(eq(documents.id, docId));
     console.error(`[Ingestion] Failed for doc ${docId}:`, message);
   }
-}
-
-async function _extractText(filePath: string, mimeType: string): Promise<string> {
-  if (mimeType === 'application/pdf') {
-    try {
-      // Read as base64 then decode to binary string.
-      // UTF-8 decoding corrupts binary PDF content — base64 preserves it.
-      const base64 = await FileSystem.readAsStringAsync(filePath, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const binary = atob(base64);
-
-      // PDF text is stored as literal strings in content streams, followed by
-      // text-show operators: Tj (single string), TJ (array), ' or "
-      // Pattern: (text content) Tj
-      const texts: string[] = [];
-      const re = /\(([^)\\]{0,500}(?:\\.[^)\\]{0,500})*)\)\s*(?:Tj|TJ|'|")/g;
-      let m: RegExpExecArray | null;
-
-      while ((m = re.exec(binary)) !== null) {
-        const chunk = m[1]
-          .replace(/\\n/g, ' ')
-          .replace(/\\r/g, ' ')
-          .replace(/\\t/g, ' ')
-          .replace(/\\\(/g, '(')
-          .replace(/\\\)/g, ')')
-          .replace(/\\\\/g, '\\')
-          .replace(/[^\x20-\x7E]/g, ''); // keep printable ASCII only
-        if (chunk.trim().length > 0) texts.push(chunk.trim());
-      }
-
-      const result = texts.join(' ').replace(/\s+/g, ' ').trim();
-      if (result.length > 50) return result.slice(0, 50000);
-    } catch {
-      // Unreadable — fall through
-    }
-    return '';
-  }
-  return '';
 }
 
 async function _setStatus(docId: string, status: string) {
