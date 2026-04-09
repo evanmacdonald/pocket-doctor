@@ -90,6 +90,23 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 
 Bugs to fix in a single cleanup PR. Each item includes the file and the fix.
 
+### 3 — Pressing "Process" on a document resets to idle immediately, appears to do nothing
+**File:** `src/ingestion/queue.ts`
+**Problem:** `_drain()` shifts the job off the queue and immediately calls `_notify()` with `queue.length = 0` — before the job has run. The `RecordsScreen` listener sees `count === 0`, clears `processingId`, and calls `loadData()`, which reloads the DB where the document status is still `pending`. The UI snaps back to showing the "Process" button even though the job is running in the background.
+**Fix:** Make `pendingCount` include the currently-running job (`_running ? 1 : 0`), and have `_notify` report `pendingCount` instead of raw `_queue.length`:
+```ts
+get pendingCount() {
+  return this._queue.length + (this._running ? 1 : 0);
+}
+
+private _notify() {
+  for (const cb of this._listeners) cb(this.pendingCount); // was: this._queue.length
+}
+```
+Count only reaches 0 after the active job finishes, not the moment it's dequeued.
+
+---
+
 ### 2 — Keyboard covers the chat input field
 **File:** `app/chat/[id].tsx`
 **Problem:** `KeyboardAvoidingView` has a hardcoded `keyboardVerticalOffset={90}`. This value represents the navigation bar height and must match the actual header height on the device. On iPhones with Dynamic Island (and other screen sizes), 90 is wrong — the input field ends up partially hidden behind the keyboard rather than being pushed above it.
