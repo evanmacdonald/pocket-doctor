@@ -92,7 +92,7 @@ Bugs to fix in a single cleanup PR. Each item includes the file and the fix.
 
 ### 3 — Pressing "Process" on a document resets to idle immediately, appears to do nothing
 **File:** `src/ingestion/queue.ts`
-**Problem:** `_drain()` shifts the job off the queue and immediately calls `_notify()` with `queue.length = 0` — before the job has run. The `RecordsScreen` listener sees `count === 0`, clears `processingId`, and calls `loadData()`, which reloads the DB where the document status is still `pending`. The UI snaps back to showing the "Process" button even though the job is running in the background.
+**Problem:** `_drain()` shifts the job off the queue and calls `_notify()` with `queue.length = 0` before `await job()`. The `RecordsScreen` listener sees `count === 0`, calls `setProcessingId(null)` (clears the spinner) and `loadData()`. Because `loadData`'s DB read was started before `_processDocument` gets to its first `await _setStatus('processing')` write, it reads `ingestionStatus: 'pending'` — so the UI snaps back to showing the "Process" button. Processing is actually running in the background the whole time; the user just has no visible indicator and presses again thinking it didn't start, queuing a duplicate job.
 **Fix:** Make `pendingCount` include the currently-running job (`_running ? 1 : 0`), and have `_notify` report `pendingCount` instead of raw `_queue.length`:
 ```ts
 get pendingCount() {
