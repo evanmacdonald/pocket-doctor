@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { getChatMessages, getChatSession, deleteChatSession } from '~/db/repositories/chat.repository';
@@ -299,6 +300,7 @@ export default function ChatThreadScreen() {
     );
   }
 
+  const headerHeight = useHeaderHeight();
   const canSend = input.trim().length > 0 && !sending;
 
   return (
@@ -318,7 +320,7 @@ export default function ChatThreadScreen() {
         <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={90}
+          keyboardVerticalOffset={headerHeight}
         >
           {loading ? (
             <View className="flex-1 items-center justify-center">

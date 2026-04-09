@@ -47,7 +47,7 @@ export type ParsedFhirBundle = z.infer<typeof FhirBundleSchema>;
 
 const KNOWN_GOOD_MODELS: Record<string, string> = {
   openai:    'gpt-4o-mini',
-  anthropic: 'claude-3-5-haiku-latest',
+  anthropic: 'claude-3-5-sonnet-latest',
   gemini:    'gemini-1.5-flash',
 };
 
@@ -149,7 +149,7 @@ export async function normalizeDocumentToFhir(opts: {
         { role: 'user',   content: 'Extract all health records from this document.' },
       ],
       model,
-      maxTokens:      8192,
+      maxTokens:      16384,
       temperature:    0,
       fileAttachment: { base64, mimeType: opts.mimeType },
     });

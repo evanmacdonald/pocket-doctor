@@ -413,7 +413,7 @@ export default function NewRecordScreen() {
       setSelectedType(type);
       setForm(preloaded);
       setLoadingEdit(false);
-    });
+    }).catch(() => setLoadingEdit(false));
   }, [edit]);
 
   const patch = (partial: Partial<FormState>) => setForm((prev) => ({ ...prev, ...partial }));
