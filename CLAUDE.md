@@ -86,6 +86,20 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install
 
 ---
 
+## Bug Cleanup
+
+Bugs to fix in a single cleanup PR. Each item includes the file and the fix.
+
+### 1 — Ingestion `maxTokens` too low — documents fail with truncated JSON
+**File:** `src/ingestion/normalizers/fhir.normalizer.ts`
+**Problem:** The file-ingestion path passes `maxTokens: 8192` to the LLM. A routine 3-page lab result with ~20 labs can produce 6–8k tokens of FHIR JSON just for the Observation resources, pushing right against the ceiling. When output is truncated, `JSON.parse` throws and the entire document fails to ingest.
+**Fix:**
+- Raise `maxTokens` to `16384` on the `filePath` branch (line ~152). This immediately helps OpenAI (`gpt-4o-mini` supports 16k output) and gives headroom for Gemini models that support higher limits.
+- Change the Anthropic default ingestion model from `claude-3-5-haiku-latest` to `claude-3-5-sonnet-latest` in `KNOWN_GOOD_MODELS`. Haiku is capped at 8192 output tokens at the model level, so raising `maxTokens` alone won't help Anthropic users — a more capable model is needed.
+- The `rawText` path's `maxTokens: 4096` can stay as-is; the `MAX_INPUT_CHARS = 12000` input cap naturally bounds the output complexity on that path.
+
+---
+
 ## Roadmap
 
 Four independent PRs, each targeting branch `claude/refactor-llm-processing-Fy8w7` (or a fresh branch per PR). Implement in order — PR 1 first, then PR 2, then PR 3 and PR 4 can be done in parallel.
