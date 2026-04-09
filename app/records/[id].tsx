@@ -131,7 +131,7 @@ export default function RecordDetailScreen() {
     });
   }, [id]);
 
-  const canEdit = record?.sourceDocumentId === null;
+  const canEdit = record != null;
 
   const handleEdit = () => {
     if (!id) return;
