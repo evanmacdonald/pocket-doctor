@@ -11,7 +11,7 @@ describe('getSetting()', () => {
 
   it('returns the typed default when no row exists', async () => {
     (mockDb.query.appSettings.findFirst as jest.Mock).mockResolvedValueOnce(undefined);
-    expect(await getSetting('active_provider')).toBe('openai');
+    expect(await getSetting('active_provider')).toBe(null);
     expect(await getSetting('auto_lock_seconds')).toBe(300);
     expect(await getSetting('has_completed_onboarding')).toBe(false);
   });

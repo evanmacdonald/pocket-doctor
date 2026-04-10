@@ -30,8 +30,8 @@ class ProviderRegistry {
     const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
     if (!apiKey) return null;
 
-    const activeProvider = await getSetting('active_provider') as LLMProviderName;
-    if (activeProvider !== name) return null;
+    const activeProvider = await getSetting('active_provider');
+    if (!activeProvider || activeProvider !== name) return null;
 
     const provider = await this._createProvider(name, apiKey);
     this._cached = provider;
@@ -47,7 +47,9 @@ class ProviderRegistry {
     const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
     if (!apiKey) return null;
 
-    const name = await getSetting('active_provider') as LLMProviderName;
+    const name = await getSetting('active_provider');
+    if (!name) return null;
+
     if (this._cached && this._cachedProviderName === name) {
       return this._cached;
     }
@@ -65,7 +67,8 @@ class ProviderRegistry {
   async getConfiguredProviders(): Promise<LLMProviderName[]> {
     const apiKey = await getSecureItem(SecureKeys.ACTIVE_API_KEY);
     if (!apiKey) return [];
-    const name = await getSetting('active_provider') as LLMProviderName;
+    const name = await getSetting('active_provider');
+    if (!name) return [];
     return [name];
   }
 
@@ -77,7 +80,9 @@ class ProviderRegistry {
     const apiKey = await getSecureItem(SecureKeys.INGESTION_API_KEY);
     if (!apiKey) return null;
 
-    const name = await getSetting('ingestion_provider') as LLMProviderName;
+    const name = await getSetting('ingestion_provider');
+    if (!name) return null;
+
     if (this._cachedIngestion && this._cachedIngestionName === name) {
       return this._cachedIngestion;
     }

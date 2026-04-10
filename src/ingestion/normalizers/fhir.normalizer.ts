@@ -59,11 +59,11 @@ async function resolveProvider(): Promise<{
 }> {
   // Try the dedicated ingestion key first; fall back to the chat key if no
   // ingestion key is configured.
-  let providerName = await getSetting('ingestion_provider') as LLMProviderName;
-  let provider     = await providerRegistry.getIngestionProvider();
+  let providerName: LLMProviderName | null = await getSetting('ingestion_provider');
+  let provider = await providerRegistry.getIngestionProvider();
 
   if (!provider) {
-    providerName = await getSetting('active_provider') as LLMProviderName;
+    providerName = await getSetting('active_provider');
     provider     = await providerRegistry.getActiveProvider();
   }
 
@@ -78,17 +78,21 @@ async function resolveProvider(): Promise<{
     provider     = (await providerRegistry.getProvider(providerName))!;
   }
 
+  // providerName is guaranteed non-null here: either set alongside a provider
+  // above, or set from configured[0] (which would have thrown if empty).
+  const resolvedProviderName = providerName!;
+
   // For Gemini, always use listModels() — model names change frequently
   let model: string;
-  if (providerName === 'gemini') {
+  if (resolvedProviderName === 'gemini') {
     const available = await provider.listModels();
     const preferred = available.find((m) => m.includes('flash')) ?? available[0];
     model = preferred ?? KNOWN_GOOD_MODELS.gemini;
   } else {
-    model = await getSetting('ingestion_model') || KNOWN_GOOD_MODELS[providerName] || 'gpt-4o-mini';
+    model = (await getSetting('ingestion_model')) || KNOWN_GOOD_MODELS[resolvedProviderName] || 'gpt-4o-mini';
   }
 
-  return { provider, providerName, model };
+  return { provider, providerName: resolvedProviderName, model };
 }
 
 function _parseResponse(response: string): ParsedFhirBundle {

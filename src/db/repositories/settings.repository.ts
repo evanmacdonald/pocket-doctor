@@ -7,10 +7,10 @@ import { appSettings } from '../schema';
 export type ProviderName = 'openai' | 'anthropic' | 'gemini' | 'custom';
 
 export interface AppSettingsMap {
-  active_provider:           ProviderName;
-  active_model:              string;
-  ingestion_provider:        ProviderName;
-  ingestion_model:           string;
+  active_provider:           ProviderName | null;
+  active_model:              string | null;
+  ingestion_provider:        ProviderName | null;
+  ingestion_model:           string | null;
   has_completed_onboarding:  boolean;
   auto_lock_seconds:         number;
   custom_base_url:           string;
@@ -18,10 +18,10 @@ export interface AppSettingsMap {
 }
 
 const DEFAULTS: AppSettingsMap = {
-  active_provider:          'openai',
-  active_model:             'gpt-4o-mini',
-  ingestion_provider:       'openai',  // overridden at runtime by auto-detection
-  ingestion_model:          'gpt-4o-mini',
+  active_provider:          null,
+  active_model:             null,
+  ingestion_provider:       null,
+  ingestion_model:          null,
   has_completed_onboarding: false,
   auto_lock_seconds:        300,
   custom_base_url:          '',
