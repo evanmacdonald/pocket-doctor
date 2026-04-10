@@ -142,7 +142,7 @@ async function _processDocument(
     for (const entry of fhirEntries) {
       const resource = entry.resource;
       if (!resource?.resourceType) continue;
-      if (resource.resourceType === 'Patient') continue;
+      if (['Patient', 'Practitioner', 'Organization', 'DiagnosticReport'].includes(resource.resourceType)) continue;
 
       const effectiveDate = _extractEffectiveDate(resource);
       await upsertFhirResource({

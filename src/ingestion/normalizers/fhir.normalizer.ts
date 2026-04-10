@@ -20,7 +20,8 @@ Include only resources where you have sufficient information:
 - AllergyIntolerance
 - Immunization
 - Procedure
-- DiagnosticReport (lab panels, imaging reports)
+
+Do NOT extract: Practitioner, Organization, DiagnosticReport, or any other resource types not listed above.
 
 Rules:
 - Return ONLY valid JSON. No markdown code fences. No explanatory text before or after.

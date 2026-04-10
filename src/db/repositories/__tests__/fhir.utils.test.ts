@@ -45,15 +45,6 @@ describe('fingerprintResource()', () => {
     expect(h).toMatch(/^Procedure:/);
   });
 
-  it('handles DiagnosticReport', () => {
-    const h = fingerprintResource('DiagnosticReport', JSON.stringify({
-      code: { text: 'CBC' },
-      effectiveDateTime: '2024-02-01',
-      conclusion: 'Normal',
-    }));
-    expect(h).toMatch(/^DiagnosticReport:/);
-  });
-
   it('produces unsigned 32-bit hash (no negative sign)', () => {
     // generate many fingerprints to ensure >>> 0 keeps values positive
     const types = ['Condition', 'Observation', 'MedicationStatement', 'AllergyIntolerance'];
@@ -134,18 +125,6 @@ describe('extractTextContent()', () => {
     const text = extractTextContent(json, 'Immunization');
     expect(text).toContain('COVID-19 vaccine');
     expect(text).toContain('BNT162b2');
-  });
-
-  it('extracts DiagnosticReport fields', () => {
-    const json = JSON.stringify({
-      code: { text: 'Lipid panel' },
-      conclusion: 'Cholesterol elevated',
-      presentedForm: [{ title: 'Lab results' }],
-    });
-    const text = extractTextContent(json, 'DiagnosticReport');
-    expect(text).toContain('Lipid panel');
-    expect(text).toContain('Cholesterol elevated');
-    expect(text).toContain('Lab results');
   });
 
   it('falls back to default branch for unknown resource types', () => {
