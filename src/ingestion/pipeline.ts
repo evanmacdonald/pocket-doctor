@@ -100,6 +100,27 @@ export async function ingestDocument(params: IngestDocumentParams): Promise<stri
   return id;
 }
 
+// ─── Retry helpers ────────────────────────────────────────────────────────────
+
+function _isTransientError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b(429|500|502|503|504)\b/.test(msg) ||
+    /network error|UNAVAILABLE|high demand|timeout/i.test(msg);
+}
+
+async function _withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === maxAttempts || !_isTransientError(err)) throw err;
+      await new Promise(resolve => setTimeout(resolve, 2000 * 2 ** (attempt - 1)));
+    }
+  }
+  // unreachable, but TypeScript needs it
+  throw new Error('Retry exhausted');
+}
+
 // ─── Internal processing ──────────────────────────────────────────────────────
 
 async function _processDocument(
@@ -120,10 +141,14 @@ async function _processDocument(
       fhirEntries = bundle.entry ?? [];
     } else if (params.filePath) {
       // Send the file directly to the LLM as inline base64 data
-      const bundle = await normalizeDocumentToFhir({ filePath: params.filePath, mimeType: params.mimeType });
+      const bundle = await _withRetry(() =>
+        normalizeDocumentToFhir({ filePath: params.filePath, mimeType: params.mimeType })
+      );
       fhirEntries = bundle.entry ?? [];
     } else if (params.rawText) {
-      const bundle = await normalizeDocumentToFhir({ rawText: params.rawText });
+      const bundle = await _withRetry(() =>
+        normalizeDocumentToFhir({ rawText: params.rawText })
+      );
       fhirEntries = bundle.entry ?? [];
     } else {
       throw new Error(
