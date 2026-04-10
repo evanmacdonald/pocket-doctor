@@ -1,6 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
+import { setSetting } from '~/db/repositories/settings.repository';
+import { restoredTab } from '~/navigation/last-tab';
 
 function TabIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -15,6 +17,15 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName={restoredTab}
+      screenListeners={{
+        state: (e: { data?: { state?: { routes: { name: string }[]; index: number } } }) => {
+          const state = e.data?.state;
+          if (!state) return;
+          const name = state.routes[state.index]?.name;
+          if (name) setSetting('last_active_tab', name);
+        },
+      }}
       screenOptions={{
         tabBarActiveTintColor: tint,
         headerStyle: {
