@@ -12,6 +12,7 @@ export function clearModelCache(): void {
 import { buildFullContext } from './context-builder';
 import { addChatMessage, getChatMessages, updateChatSessionTitle } from '~/db/repositories/chat.repository';
 import { logEvent } from '~/db/repositories/audit.repository';
+import { DEFAULT_MODELS } from './types';
 import type { LLMProviderName } from './types';
 import type { ChatCompletionChunk } from './types';
 
@@ -52,21 +53,23 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   const { sessionId, userMessage, onChunk } = params;
 
   const [providerName, storedModel] = await Promise.all([
-    getSetting('active_provider') as Promise<LLMProviderName>,
+    getSetting('active_provider'),
     getSetting('active_model'),
   ]);
 
+  if (!providerName) {
+    throw new Error('No AI provider configured. Go to Settings → AI & Chat to add an API key.');
+  }
+
   const provider = await providerRegistry.getProvider(providerName);
   if (!provider) {
-    throw new Error(
-      `No API key configured for ${providerName}. Go to Settings → API Keys to add one.`
-    );
+    throw new Error('No API key configured. Go to Settings → AI & Chat to add one.');
   }
 
   // Stored model names go stale as providers deprecate them. Verify the stored
   // model is still available and fall back to the best available if not.
   // Result is cached per provider to avoid a listModels() call on every message.
-  let model = storedModel;
+  let model: string | null = storedModel;
   if (!resolvedModelCache.has(providerName)) {
     const available = await provider.listModels();
     if (available.length > 0) {
@@ -83,7 +86,7 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
       }
     }
   }
-  model = resolvedModelCache.get(providerName) ?? storedModel;
+  model = resolvedModelCache.get(providerName) ?? storedModel ?? DEFAULT_MODELS[providerName];
 
   // ── 1. Load all health records as context ─────────────────────────────────
   const { context, fhirIds } = await buildFullContext();

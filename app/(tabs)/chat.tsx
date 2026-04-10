@@ -13,8 +13,8 @@ import {
 } from '~/db/repositories/chat.repository';
 import { getSetting } from '~/db/repositories/settings.repository';
 import { providerRegistry } from '~/llm/provider-registry';
+import { DEFAULT_MODELS } from '~/llm/types';
 import type { ChatSession } from '~/db/schema';
-import type { LLMProviderName } from '~/llm/types';
 
 // ─── Time formatting ─────────────────────────────────────────────────────────
 
@@ -111,17 +111,22 @@ export default function ChatsScreen() {
     setCreating(true);
     try {
       const [providerName, model] = await Promise.all([
-        getSetting('active_provider') as Promise<LLMProviderName>,
+        getSetting('active_provider'),
         getSetting('active_model'),
       ]);
 
-      const provider = await providerRegistry.getProvider(providerName);
-      if (!provider) {
-        Alert.alert('No API Key', `No API key configured for ${providerName}. Go to Settings → API Keys to add one.`);
+      if (!providerName) {
+        Alert.alert('No API Key', 'No provider configured. Go to Settings → AI & Chat to add one.');
         return;
       }
 
-      const id = await createChatSession({ provider: providerName, model, searchMode: 'full' });
+      const provider = await providerRegistry.getProvider(providerName);
+      if (!provider) {
+        Alert.alert('No API Key', 'No API key configured. Go to Settings → AI & Chat to add one.');
+        return;
+      }
+
+      const id = await createChatSession({ provider: providerName, model: model ?? DEFAULT_MODELS[providerName], searchMode: 'full' });
       router.push(`/chat/${id}`);
     } catch (e: unknown) {
       Alert.alert('Error', (e as Error).message ?? 'Could not start chat');

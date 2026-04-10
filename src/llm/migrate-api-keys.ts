@@ -23,7 +23,7 @@ export async function migrateApiKeysIfNeeded(): Promise<void> {
   const alreadyMigrated = await getSetting('has_migrated_api_key');
   if (alreadyMigrated) return;
 
-  const activeProvider = await getSetting('active_provider') as LLMProviderName;
+  const activeProvider = await getSetting('active_provider');
 
   const legacyKeyMap: Record<string, typeof SecureKeys[keyof typeof SecureKeys]> = {
     openai:    SecureKeys._LEGACY_OPENAI_KEY,
@@ -31,16 +31,15 @@ export async function migrateApiKeysIfNeeded(): Promise<void> {
     gemini:    SecureKeys._LEGACY_GEMINI_KEY,
   };
 
-  // Try active provider first, then others
-  const orderedProviders = [
-    activeProvider,
-    ...(['openai', 'anthropic', 'gemini'] as LLMProviderName[]).filter(
-      (p) => p !== activeProvider
-    ),
+  // Try active provider first (if set), then others
+  const allProviders: LLMProviderName[] = ['openai', 'anthropic', 'gemini'];
+  const orderedProviders: LLMProviderName[] = [
+    ...(activeProvider ? [activeProvider] : []),
+    ...allProviders.filter((p) => p !== activeProvider),
   ];
 
   let migratedKey: string | null = null;
-  let migratedProvider: LLMProviderName = activeProvider;
+  let migratedProvider: LLMProviderName = 'openai';
 
   for (const p of orderedProviders) {
     const legacyKey = legacyKeyMap[p];

@@ -102,13 +102,17 @@ export default function ApiKeysScreen() {
       const key = await getSecureItem(keyName);
       if (key) {
         const [provider, model] = await Promise.all([
-          getSetting(providerKey) as Promise<LLMProviderName>,
+          getSetting(providerKey),
           getSetting(modelKey),
         ]);
-        setActiveProvider(provider);
-        setActiveModel(model);
-        setActiveKey(key);
-        setStep('view');
+        if (provider) {
+          setActiveProvider(provider);
+          setActiveModel(model ?? '');
+          setActiveKey(key);
+          setStep('view');
+        } else {
+          setStep('select');
+        }
       } else {
         setStep('select');
       }
