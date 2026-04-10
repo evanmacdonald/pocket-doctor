@@ -15,6 +15,7 @@ export interface AppSettingsMap {
   auto_lock_seconds:         number;
   custom_base_url:           string;
   has_migrated_api_key:      boolean;
+  last_active_tab:           string | null;
 }
 
 const DEFAULTS: AppSettingsMap = {
@@ -26,6 +27,7 @@ const DEFAULTS: AppSettingsMap = {
   auto_lock_seconds:        300,
   custom_base_url:          '',
   has_migrated_api_key:     false,
+  last_active_tab:          null,
 };
 
 export async function getSetting<K extends keyof AppSettingsMap>(

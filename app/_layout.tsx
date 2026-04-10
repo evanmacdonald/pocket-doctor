@@ -10,6 +10,8 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { openDatabase } from '~/db/client';
 import { migrateApiKeysIfNeeded } from '~/llm/migrate-api-keys';
 import { biometricService } from '~/auth/biometric.service';
+import { getSetting } from '~/db/repositories/settings.repository';
+import { initRestoredTab } from '~/navigation/last-tab';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -29,6 +31,8 @@ export default function RootLayout() {
   useEffect(() => {
     openDatabase()
       .then(() => migrateApiKeysIfNeeded())
+      .then(() => getSetting('last_active_tab'))
+      .then(initRestoredTab)
       .then(() => setDbReady(true))
       .catch((e) => { throw e; });
   }, []);
