@@ -20,7 +20,6 @@ const RESOURCE_TYPE_CONFIG: Record<string, { label: string; icon: string; color:
   AllergyIntolerance:  { label: 'Allergy',      icon: '⚠️', color: 'bg-amber-50 dark:bg-amber-950' },
   Immunization:        { label: 'Immunization', icon: '💉', color: 'bg-green-50 dark:bg-green-950' },
   Procedure:           { label: 'Procedure',    icon: '🏥', color: 'bg-indigo-50 dark:bg-indigo-950' },
-  DiagnosticReport:    { label: 'Report',       icon: '📄', color: 'bg-gray-50 dark:bg-gray-900' },
 };
 
 function getResourceConfig(type: string) {
@@ -123,7 +122,7 @@ export default function DescribeRecordScreen() {
       const bundle = await normalizeDocumentToFhir({ rawText: trimmed });
       const items: ExtractedItem[] = ((bundle.entry ?? []) as Array<{ resource: RawResource }>)
         .map((e) => e.resource)
-        .filter((r): r is RawResource => typeof r?.resourceType === 'string' && r.resourceType !== 'Patient')
+        .filter((r): r is RawResource => typeof r?.resourceType === 'string' && !['Patient', 'Practitioner', 'Organization', 'DiagnosticReport'].includes(r.resourceType as string))
         .map((r) => ({ resourceType: r.resourceType as string, resource: r }));
 
       if (items.length === 0) {

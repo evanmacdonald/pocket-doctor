@@ -41,10 +41,6 @@ export function fingerprintResource(resourceType: string, resourceJson: string):
       case 'Procedure':
         parts.push(r.performedDateTime ?? r.performedPeriod?.start);
         break;
-      case 'DiagnosticReport':
-        parts.push(r.effectiveDateTime ?? r.effectivePeriod?.start);
-        parts.push(r.conclusion);
-        break;
     }
 
     const key = parts.filter(Boolean).join('|').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -97,9 +93,6 @@ export function extractTextContent(resourceJson: string, resourceType: string): 
         break;
       case 'Procedure':
         push(r.code?.text, r.code?.coding?.[0]?.display, r.note?.[0]?.text);
-        break;
-      case 'DiagnosticReport':
-        push(r.code?.text, r.code?.coding?.[0]?.display, r.conclusion, r.presentedForm?.[0]?.title);
         break;
       default:
         push(r.code?.text, r.text?.div?.replace(/<[^>]+>/g, ' '));

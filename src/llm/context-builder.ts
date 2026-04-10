@@ -10,7 +10,8 @@ export async function buildFullContext(): Promise<{
   context: string;
   fhirIds: string[];
 }> {
-  const resources = (await getAllFhirResources(500)).filter((r) => r.resourceType !== 'Patient');
+  const EXCLUDED_TYPES = new Set(['Patient', 'Practitioner', 'Organization', 'DiagnosticReport']);
+  const resources = (await getAllFhirResources(500)).filter((r) => !EXCLUDED_TYPES.has(r.resourceType));
 
   if (resources.length === 0) {
     return {
@@ -34,7 +35,6 @@ export async function buildFullContext(): Promise<{
     AllergyIntolerance:   'Allergies',
     Immunization:         'Immunizations',
     Procedure:            'Procedures',
-    DiagnosticReport:     'Diagnostic Reports',
   };
 
   const lines: string[] = ['=== Patient Health Records ==='];
@@ -104,11 +104,6 @@ function formatFhirForContext(
         const proc = r.code?.text ?? r.code?.coding?.[0]?.display ?? 'Unknown procedure';
         const note = r.note?.[0]?.text ? ` — ${r.note[0].text}` : '';
         return `Procedure${date}: ${proc}${note}`;
-      }
-      case 'DiagnosticReport': {
-        const name = r.code?.text ?? r.code?.coding?.[0]?.display ?? 'Report';
-        const conclusion = r.conclusion ? ` — ${r.conclusion}` : '';
-        return `Diagnostic Report${date}: ${name}${conclusion}`;
       }
       default:
         return `${resourceType}${date}: ${JSON.stringify(r).slice(0, 300)}`;
